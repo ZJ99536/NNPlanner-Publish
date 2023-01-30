@@ -24,13 +24,12 @@ def status_cb(data):
     
 if __name__ == "__main__":
 
-    waypoint0 = np.array([2.0, 2.0, 2.0])
-    waypoint1 = np.array([2.0, 4.0, 2.0])
-    current_lambda = [1, 0]
+    waypoint0 = np.array([2.0, 2.0, 3.0])
+    waypoint1 = np.array([1.6, 4.0, 2.0])
+    current_lambda = [1, 1]
 
     rospy.init_node("planner")
-    # pub = rospy.Publisher("ros_message",String,queue_size=10)
-    # message = String()
+
     odom_sub = rospy.Subscriber('/uav0/mavros/local_position/odom',Odometry,odometry_cb)
     status_sub = rospy.Subscriber('/offb_node/status',Bool,status_cb)
 
@@ -45,16 +44,16 @@ if __name__ == "__main__":
     command_planner_pub = rospy.Publisher('planner/command', Vector3Stamped, queue_size=1)
     command_setpoint = Vector3Stamped()
 
-    rate = rospy.Rate(40)
+    rate = rospy.Rate(10)
 
-    model = keras.models.load_model('/home/zhoujin/learning/model/quad1.h5')
+    model = keras.models.load_model('/home/zhoujin/learning/model/quad1_m2.h5')
     dataset = loadtxt('/home/zhoujin/trajectory-generation/trajectory/quad1.txt', delimiter=',')
     # split into input (X) and output (y) variables
 
-    X = dataset[:,0:8]
+    X = dataset[:,0:6]
     y = dataset[:,8:26]
 
-    input = dataset[0,0:8]
+    input = dataset[0,0:6]
 
     min_max_scaler = MinMaxScaler()
     min_max_scaler.fit(X)
@@ -70,25 +69,31 @@ if __name__ == "__main__":
         # message.data = "pub message to sub " +str(count)
         # pub.publish(message)
         # rospy.loginfo("pub message it is : %s",message.data)
-        input = dataset[0,0:8]
+        # current_position[0] = 1.0
+        # current_position[1] = 1.0
+        # current_position[2] = 2.1
+        # is_ready = 0
+
+        input = dataset[0,0:6]
         # print(current_position)
         error0 = waypoint0 - current_position
         error1 = waypoint1 - current_position
         for i in range(3):
             input[i] = error0[i]
             input[i+3] = error1[i]
-        input[6] = current_lambda[0]
-        input[7] = current_lambda[1]
+        # input[6] = current_lambda[0]
+        # input[7] = current_lambda[1]
         # print(input[0])
-        output = model.predict(scalerX.transform(input.reshape(-1,8)))
+        output = model.predict(scalerX.transform(input.reshape(-1,6)))
         output = scalery.inverse_transform(output)
-        # print(output[0,2])
+        # print(output[0,1])
 
         position_setpoint.vector.x = ((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2
         position_setpoint.vector.y = ((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2
         position_setpoint.vector.z = ((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2
         position_setpoint.header.stamp = rospy.Time.now()
         position_planner_pub.publish(position_setpoint)
+        print(position_setpoint.vector.y)
 
         velocity_setpoint.vector.x = output[0, 6]
         velocity_setpoint.vector.y = output[0, 7]
@@ -112,11 +117,13 @@ if __name__ == "__main__":
         command_setpoint.vector.y = output[0, 16]
         command_setpoint.vector.z = output[0, 17]
         command_setpoint.header.stamp = rospy.Time.now()
-        rate_planner_pub.publish(command_setpoint)
+        command_planner_pub.publish(command_setpoint)
 
         if is_ready:
             current_lambda = [command_setpoint.vector.y, command_setpoint.vector.z]
-        print(is_ready)
+        else:
+            current_lambda = [1, 1]
+        # print(is_ready)
 
         # rospy.spin()
         rate.sleep()
