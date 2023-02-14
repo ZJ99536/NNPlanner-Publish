@@ -63,7 +63,8 @@ if __name__ == "__main__":
 
     rate = rospy.Rate(ros_freq)
 
-    model = keras.models.load_model('/home/zhoujin/learning/model/quad5_m6.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    model = keras.models.load_model('/home/zhoujin/learning/model/quad5_m5.h5')
+    model_sec = keras.models.load_model('/home/zhoujin/learning/model/quad5_sec.h5')
     val = keras.models.load_model('/home/zhoujin/learning/model/quad5_val.h5')
     # dataset = loadtxt('/home/zhoujin/trajectory-generation/trajectory/quad2.txt', delimiter=',')
     # split into input (X) and output (y) variables
@@ -85,6 +86,7 @@ if __name__ == "__main__":
     while not rospy.is_shutdown():
 
         input = np.zeros(15)
+        input_sec = np.zeros(12)
         input_val = np.zeros(6)
         # print(current_position)
         error0 = waypoint0 - current_position
@@ -92,61 +94,83 @@ if __name__ == "__main__":
         for i in range(3):
             input[i] = error0[i]
             input[i+3] = error1[i]
-            input_val[i] = error0[i]
-            input_val[i+3] = error1[i]
             input[i+6] = current_velocity[i]
             input[i+9] = current_acc[i]
             input[i+12] = current_rate[i]
+            input_sec[i] = error1[i]
+            input_sec[i+3] = current_velocity[i]
+            input_sec[i+6] = current_acc[i]
+            input_sec[i+9] = current_rate[i]
+            input_val[i] = error0[i]
+            input_val[i+3] = error1[i]
+            
         # input[6] = current_lambda[0]
         # input[7] = current_lambda[1]
         # print(input[0])
-        output = model(input.reshape(-1,15))
+        
         output_val = val(input_val.reshape(-1,6))
         # output = model.predict(scalerX.transform(input.reshape(-1,15)))
         # output = scalery.inverse_transform(output)
         # print(output[0,1])
 
-        # if output_val[0, 0] > 0.2 :
-        #     position_setpoint.vector.x = ((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2
-        #     position_setpoint.vector.y = ((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2
-        #     position_setpoint.vector.z = ((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2
-        #     position_setpoint.header.stamp = rospy.Time.now()
-        #     position_planner_pub.publish(position_setpoint)
-        #     print(position_setpoint.vector.z)
-        # else:
-        #     position_setpoint.vector.x = waypoint1[0] - output[0, 3]
-        #     position_setpoint.vector.y = waypoint1[1] - output[0, 4]
-        #     position_setpoint.vector.z = waypoint1[2] - output[0, 5]
-        #     position_setpoint.header.stamp = rospy.Time.now()
-        #     position_planner_pub.publish(position_setpoint)
-        #     print(position_setpoint.vector.z)
+        if current_position[0] < waypoint0[0]:
+            output = model(input.reshape(-1,15))
+            position_setpoint.vector.x = ((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2
+            position_setpoint.vector.y = ((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2
+            position_setpoint.vector.z = ((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2
+            position_setpoint.header.stamp = rospy.Time.now()
+            position_planner_pub.publish(position_setpoint)
+            print(position_setpoint.vector.z)
 
-        position_setpoint.vector.x = ((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2
-        position_setpoint.vector.y = ((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2
-        position_setpoint.vector.z = ((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2
-        position_setpoint.header.stamp = rospy.Time.now()
-        position_planner_pub.publish(position_setpoint)
-        print(position_setpoint.vector.z)
+            velocity_setpoint.vector.x = output[0, 6]
+            velocity_setpoint.vector.y = output[0, 7]
+            velocity_setpoint.vector.z = output[0, 8]
+            velocity_setpoint.header.stamp = rospy.Time.now()
+            velocity_planner_pub.publish(velocity_setpoint)
 
-        velocity_setpoint.vector.x = output[0, 6]
-        velocity_setpoint.vector.y = output[0, 7]
-        velocity_setpoint.vector.z = output[0, 8]
-        velocity_setpoint.header.stamp = rospy.Time.now()
-        velocity_planner_pub.publish(velocity_setpoint)
+            attitude_setpoint.vector.x = output[0, 9]
+            attitude_setpoint.vector.y = output[0, 10]
+            attitude_setpoint.vector.z = output[0, 11]
+            attitude_setpoint.header.stamp = rospy.Time.now()
+            attitude_planner_pub.publish(attitude_setpoint)
+            print(current_acc[2])
+            print(attitude_setpoint.vector.z)
 
-        attitude_setpoint.vector.x = output[0, 9]
-        attitude_setpoint.vector.y = output[0, 10]
-        attitude_setpoint.vector.z = output[0, 11]
-        attitude_setpoint.header.stamp = rospy.Time.now()
-        attitude_planner_pub.publish(attitude_setpoint)
-        print(current_acc[2])
-        print(attitude_setpoint.vector.z)
+            rate_setpoint.vector.x = output[0, 12]
+            rate_setpoint.vector.y = output[0, 13]
+            rate_setpoint.vector.z = output[0, 14]
+            rate_setpoint.header.stamp = rospy.Time.now()
+            rate_planner_pub.publish(rate_setpoint)
 
-        rate_setpoint.vector.x = output[0, 12]
-        rate_setpoint.vector.y = output[0, 13]
-        rate_setpoint.vector.z = output[0, 14]
-        rate_setpoint.header.stamp = rospy.Time.now()
-        rate_planner_pub.publish(rate_setpoint)
+        else:
+            output = model_sec(input_sec.reshape(-1,12))
+            position_setpoint.vector.x = waypoint1[0] - output[0, 0]
+            position_setpoint.vector.y = waypoint1[1] - output[0, 1]
+            position_setpoint.vector.z = waypoint1[2] - output[0, 2]
+            position_setpoint.header.stamp = rospy.Time.now()
+            position_planner_pub.publish(position_setpoint)
+            print(position_setpoint.vector.z)
+
+            velocity_setpoint.vector.x = output[0, 3]
+            velocity_setpoint.vector.y = output[0, 4]
+            velocity_setpoint.vector.z = output[0, 5]
+            velocity_setpoint.header.stamp = rospy.Time.now()
+            velocity_planner_pub.publish(velocity_setpoint)
+
+            attitude_setpoint.vector.x = output[0, 6]
+            attitude_setpoint.vector.y = output[0, 7]
+            attitude_setpoint.vector.z = output[0, 8]
+            attitude_setpoint.header.stamp = rospy.Time.now()
+            attitude_planner_pub.publish(attitude_setpoint)
+            print(current_acc[2])
+            print(attitude_setpoint.vector.z)
+
+            rate_setpoint.vector.x = output[0, 9]
+            rate_setpoint.vector.y = output[0, 10]
+            rate_setpoint.vector.z = output[0, 11]
+            rate_setpoint.header.stamp = rospy.Time.now()
+            rate_planner_pub.publish(rate_setpoint)
+
         
         command_setpoint.vector.x = 0
         command_setpoint.vector.y = output_val[0, 0]
