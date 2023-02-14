@@ -7,7 +7,7 @@ from sklearn.preprocessing import MinMaxScaler
 import rospy
 from std_msgs.msg import  Bool
 from nav_msgs.msg import Odometry 
-from geometry_msgs.msg import Vector3Stamped
+from geometry_msgs.msg import Vector3Stamped, PoseStamped, TwistStamped
 import numpy as np
 
 current_position = np.zeros(3)
@@ -17,8 +17,8 @@ current_acc = np.zeros(3)
 current_acc[2] = 9.81
 current_rate = np.zeros(3)
 is_ready = 0
-
 ros_freq = 30.0
+vision_pos = PoseStamped()
 
 def odometry_cb(data):
     global current_position
@@ -32,6 +32,26 @@ def odometry_cb(data):
     current_acc = (current_velocity - last_velocity) * ros_freq
     current_acc[2] += 9.81
     last_velocity = current_velocity
+
+def posCb(msg):
+    global vision_pos
+    vision_pos = msg
+    vision_pos.header.stamp = rospy.Time.now()
+    # vision_pub.publish(self.vision_pos)
+    global current_position
+    current_position = np.array([vision_pos.pose.position.x,vision_pos.pose.position.y,vision_pos.pose.position.z])
+
+def vrefCb(msg):
+    global current_velocity
+    current_velocity = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z])
+    global current_rate
+    current_rate = np.array([msg.twist.angular.x,msg.twist.angular.y,msg.twist.angular.z])
+    global current_acc
+    global last_velocity
+    current_acc = (current_velocity - last_velocity) * ros_freq
+    current_acc[2] += 9.81
+    last_velocity = current_velocity
+        
 
 
 def status_cb(data):
@@ -47,8 +67,14 @@ if __name__ == "__main__":
 
     rospy.init_node("planner")
 
-    odom_sub = rospy.Subscriber('/uav0/mavros/local_position/odom',Odometry,odometry_cb)
-    status_sub = rospy.Subscriber('/offb_node/status',Bool,status_cb)
+    # odom_sub = rospy.Subscriber('/uav0/mavros/local_position/odom',Odometry,odometry_cb)
+    rospy.Subscriber("/vrpn_client_node/danzhe/pose", PoseStamped, posCb)
+    vision_pub = rospy.Publisher("/mavros/vision_pose/pose",PoseStamped, queue_size = 1)################
+    
+    # 订阅无人机当前位置作比较
+    # rospy.Subscriber("/mavros/local_position/pose", PoseStamped,refCb)
+    rospy.Subscriber("/mavros/local_position/velocity_local", TwistStamped, vrefCb)
+    # status_sub = rospy.Subscriber('/offb_node/status',Bool,status_cb)
 
     position_planner_pub = rospy.Publisher('planner/position', Vector3Stamped, queue_size=1)
     position_setpoint = Vector3Stamped()
@@ -60,6 +86,8 @@ if __name__ == "__main__":
     rate_setpoint = Vector3Stamped()
     command_planner_pub = rospy.Publisher('planner/command', Vector3Stamped, queue_size=1)
     command_setpoint = Vector3Stamped()
+
+    
 
     rate = rospy.Rate(ros_freq)
 
@@ -160,4 +188,7 @@ if __name__ == "__main__":
         # print(is_ready)
 
         # rospy.spin()
+
+        vision_pub.publish(vision_pos) #########################
+
         rate.sleep()
