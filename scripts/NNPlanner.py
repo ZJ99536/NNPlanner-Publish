@@ -41,8 +41,8 @@ def status_cb(data):
     
 if __name__ == "__main__":
 
-    waypoint0 = np.array([2.0, 0.5, 2.5])
-    waypoint1 = np.array([4.0, 0.0, 2.0])
+    waypoint0 = np.array([2.0, 0.5, 1.5])
+    waypoint1 = np.array([4.0, 0.0, 1.0])
     current_lambda = [1, 1]
 
     rospy.init_node("planner")
@@ -63,10 +63,13 @@ if __name__ == "__main__":
 
     rate = rospy.Rate(ros_freq)
 
-    model = keras.models.load_model('/home/zhoujin/learning/model/quad5_m6.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    model = keras.models.load_model('/home/zhoujin/learning/model/model1') # quad5 m4 m6(softplus 64) m5(softplus 640)
     val = keras.models.load_model('/home/zhoujin/learning/model/quad5_val.h5')
     # dataset = loadtxt('/home/zhoujin/trajectory-generation/trajectory/quad2.txt', delimiter=',')
     # split into input (X) and output (y) variables
+    # model = keras.models.load_model('/home/zhoujin/learning/model/model1')
+    # input_test = np.ones(15)
+    # print(model(input_test.reshape(-1,15)))
 
     # X = dataset[:,0:15]
     # y = dataset[:,18:36]
@@ -126,7 +129,7 @@ if __name__ == "__main__":
         position_setpoint.vector.z = ((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2
         position_setpoint.header.stamp = rospy.Time.now()
         position_planner_pub.publish(position_setpoint)
-        print(position_setpoint.vector.z)
+        # print(position_setpoint.vector.z)
 
         velocity_setpoint.vector.x = output[0, 6]
         velocity_setpoint.vector.y = output[0, 7]
