@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(NNPlanner)
+project(NNPlanner1)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -160,7 +160,7 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
-  scripts/NNPlanner.py
+  scripts/NNVal.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
