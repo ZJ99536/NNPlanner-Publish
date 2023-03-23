@@ -57,7 +57,7 @@ if __name__ == "__main__":
     rate = rospy.Rate(ros_freq)
 
     #model = keras.models.load_model('/home/nesc/BP-training/model/quad5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    val = keras.models.load_model('/home/nesc/BP-training/model/quad5_val.h5')
+    val = keras.models.load_model('/home/nesc/planner_ws/src/NNPlanner-Publish/model/quad5_val.h5')
     # dataset = loadtxt('/home/zhoujin/trajectory-generation/trajectory/quad2.txt', delimiter=',')
     # split into input (X) and output (y) variables
 
