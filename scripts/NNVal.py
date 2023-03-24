@@ -41,8 +41,8 @@ def status_cb(data):
     
 if __name__ == "__main__":
 
-    waypoint0 = np.array([1.0, 0.5, 1.2])
-    waypoint1 = np.array([3.0, 0.0, 1.0])
+    waypoint0 = np.array([0.0, 0.5, 1.2])
+    waypoint1 = np.array([2.0, 0.0, 1.0])
     current_lambda = [1, 1]
 
     rospy.init_node("planner1")
@@ -52,28 +52,9 @@ if __name__ == "__main__":
     command_planner_pub = rospy.Publisher('planner1/command', Vector3Stamped, queue_size=1)
     command_setpoint = Vector3Stamped()
 
-    
-
     rate = rospy.Rate(ros_freq)
 
-    #model = keras.models.load_model('/home/nesc/BP-training/model/quad5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    val = keras.models.load_model('/home/nesc/planner_ws/src/NNPlanner-Publish/model/quad5_val.h5')
-    # dataset = loadtxt('/home/zhoujin/trajectory-generation/trajectory/quad2.txt', delimiter=',')
-    # split into input (X) and output (y) variables
-
-    # X = dataset[:,0:15]
-    # y = dataset[:,18:36]
-
-
-    # min_max_scaler = MinMaxScaler()
-    # min_max_scaler.fit(X)
-    # scalerX = min_max_scaler
-    # # X = min_max_scaler.transform(X)
-
-    # min_max_scalery = MinMaxScaler()
-    # min_max_scalery.fit(y)
-    # scalery = min_max_scalery
-    # y = min_max_scaler.transform(y)
+    val = keras.models.load_model('/home/nesc/val_ws/src/NNPlanner-Publish/model/quad5_val.h5')
 
     while not rospy.is_shutdown():
 
@@ -86,36 +67,12 @@ if __name__ == "__main__":
             input_val[i] = error0[i]
             input_val[i+3] = error1[i]
 
-        # input[6] = current_lambda[0]
-        # input[7] = current_lambda[1]
-        # print(input[0])
-        #output = model(input.reshape(-1,15))
         output_val = val(input_val.reshape(-1,6))
-        # output = model.predict(scalerX.transform(input.reshape(-1,15)))
-        # output = scalery.inverse_transform(output)
-        # print(output[0,1])
-
-        # if output_val[0, 0] > 0.2 :
-        #     position_setpoint.vector.x = ((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2
-        #     position_setpoint.vector.y = ((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2
-        #     position_setpoint.vector.z = ((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2
-        #     position_setpoint.header.stamp = rospy.Time.now()
-        #     position_planner_pub.publish(position_setpoint)
-        #     print(position_setpoint.vector.z)
-        # else:
-        #     position_setpoint.vector.x = waypoint1[0] - output[0, 3]
-        #     position_setpoint.vector.y = waypoint1[1] - output[0, 4]
-        #     position_setpoint.vector.z = waypoint1[2] - output[0, 5]
-        #     position_setpoint.header.stamp = rospy.Time.now()
-        #     position_planner_pub.publish(position_setpoint)
-        #     print(position_setpoint.vector.z)
-
 
         command_setpoint.vector.x = 0
         command_setpoint.vector.y = output_val[0, 0]
         command_setpoint.vector.z = output_val[0, 1]
         command_setpoint.header.stamp = rospy.Time.now()
         command_planner_pub.publish(command_setpoint)
-
-
+        
         rate.sleep()
