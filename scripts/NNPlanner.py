@@ -23,6 +23,8 @@ ros_freq = 30.0
 
 last_time = time()
 
+last_loop_time = time()
+
 last_pos_cmd = np.zeros(3)
 last_vel_cmd = np.zeros(3)
 last_acc_cmd = np.zeros(3)
@@ -56,6 +58,18 @@ kqz = 0.4
 #kqy = 1
 #kqz = 1
 
+kcmd_x = 0.5
+kcmd_y = 0.5
+kcmd_z = 0.5
+kcmd_vx = 0.5
+kcmd_vy = 0.5
+kcmd_vz = 0.5
+kcmd_ax = 0.5
+kcmd_ay = 0.5
+kcmd_az = 0.5
+kcmd_qx = 0.5
+kcmd_qy = 0.5
+kcmd_qz = 0.5
 
 
 def odometry_cb(data):
@@ -104,6 +118,11 @@ if __name__ == "__main__":
     rate = rospy.Rate(ros_freq)
 
     model = keras.models.load_model('/home/nesc/planner_ws/src/NNPlanner-Publish/model/quad5_m5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+
+    current_pos_cmd = np.zeros(3)
+    current_vel_cmd = np.zeros(3)
+    current_acc_cmd = np.zeros(3)
+    current_pqr_cmd = np.zeros(3)
     
     while not rospy.is_shutdown():
 
@@ -121,28 +140,49 @@ if __name__ == "__main__":
         output = model(input.reshape(-1,15))
 
         if is_ready:
-            position_setpoint.vector.x = last_pos_cmd[0] + (((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2 - last_pos_cmd[0]) * kx
-            position_setpoint.vector.y = last_pos_cmd[1] + (((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2 - last_pos_cmd[1]) * ky
-            position_setpoint.vector.z = last_pos_cmd[2] + (((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2 - last_pos_cmd[2]) * kz
+            current_pos_cmd[0] = ((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2
+            current_pos_cmd[1] = ((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2
+            current_pos_cmd[2] = ((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2
+            if np.linalg.norm(current_position - current_pos_cmd) > 1.2 :
+                current_pos_cmd = last_pos_cmd
+                current_vel_cmd = last_vel_cmd
+                current_acc_cmd = last_acc_cmd
+                current_pqr_cmd = last_pqr_cmd
+            else :
+                current_vel_cmd[0] = output[0, 6]
+                current_vel_cmd[1] = output[0, 7]
+                current_vel_cmd[2] = output[0, 8]
+                current_acc_cmd[0] = output[0, 9]
+                current_acc_cmd[1] = output[0, 10]
+                current_acc_cmd[2] = output[0, 11]
+                current_pqr_cmd[0] = output[0, 12]
+                current_pqr_cmd[1] = output[0, 13]
+                current_pqr_cmd[2] = output[0, 14]
+
+
+
+            position_setpoint.vector.x = last_pos_cmd[0] + (current_pos_cmd[0] - last_pos_cmd[0]) * kx
+            position_setpoint.vector.y = last_pos_cmd[1] + (current_pos_cmd[1] - last_pos_cmd[1]) * ky
+            position_setpoint.vector.z = last_pos_cmd[2] + (current_pos_cmd[2] - last_pos_cmd[2]) * kz
             position_setpoint.header.stamp = rospy.Time.now()
             position_planner_pub.publish(position_setpoint)
 
-            velocity_setpoint.vector.x = last_vel_cmd[0] + (output[0, 6] - last_vel_cmd[0]) * kvx
-            velocity_setpoint.vector.y = last_vel_cmd[1] + (output[0, 7] - last_vel_cmd[1]) * kvy
-            velocity_setpoint.vector.z = last_vel_cmd[2] + (output[0, 8] - last_vel_cmd[2]) * kvz
+            velocity_setpoint.vector.x = last_vel_cmd[0] + (current_vel_cmd[0] - last_vel_cmd[0]) * kvx
+            velocity_setpoint.vector.y = last_vel_cmd[1] + (current_vel_cmd[1] - last_vel_cmd[1]) * kvy
+            velocity_setpoint.vector.z = last_vel_cmd[2] + (current_vel_cmd[2] - last_vel_cmd[2]) * kvz
             velocity_setpoint.header.stamp = rospy.Time.now()
             velocity_planner_pub.publish(velocity_setpoint)
 
-            attitude_setpoint.vector.x = last_acc_cmd[0] + (output[0, 9] - last_acc_cmd[0]) * kax
-            attitude_setpoint.vector.y = last_acc_cmd[1] + (output[0, 10] - last_acc_cmd[1]) * kay
-            attitude_setpoint.vector.z = last_acc_cmd[2] + (output[0, 11] - last_acc_cmd[2]) * kaz
+            attitude_setpoint.vector.x = last_acc_cmd[0] + (current_acc_cmd[0] - last_acc_cmd[0]) * kax
+            attitude_setpoint.vector.y = last_acc_cmd[1] + (current_acc_cmd[1] - last_acc_cmd[1]) * kay
+            attitude_setpoint.vector.z = last_acc_cmd[2] + (current_acc_cmd[2] - last_acc_cmd[2]) * kaz
             attitude_setpoint.header.stamp = rospy.Time.now()
             attitude_planner_pub.publish(attitude_setpoint)
 
 
-            rate_setpoint.vector.x = last_pqr_cmd[0] + (output[0, 12] - last_pqr_cmd[0]) * kqx
-            rate_setpoint.vector.y = last_pqr_cmd[1] + (output[0, 13] - last_pqr_cmd[1]) * kqy
-            rate_setpoint.vector.z = last_pqr_cmd[2] + (output[0, 14] - last_pqr_cmd[2]) * kqz
+            rate_setpoint.vector.x = last_pqr_cmd[0] + (current_pqr_cmd[0] - last_pqr_cmd[0]) * kqx
+            rate_setpoint.vector.y = last_pqr_cmd[1] + (current_pqr_cmd[1] - last_pqr_cmd[1]) * kqy
+            rate_setpoint.vector.z = last_pqr_cmd[2] + (current_pqr_cmd[2] - last_pqr_cmd[2]) * kqz
             rate_setpoint.header.stamp = rospy.Time.now()
             rate_planner_pub.publish(rate_setpoint)
         
@@ -184,18 +224,22 @@ if __name__ == "__main__":
             rate_setpoint.header.stamp = rospy.Time.now()
             rate_planner_pub.publish(rate_setpoint)
 
-        
-        last_pos_cmd[0] = position_setpoint.vector.x
-        last_pos_cmd[1] = position_setpoint.vector.y
-        last_pos_cmd[2] = position_setpoint.vector.z
-        last_vel_cmd[0] = velocity_setpoint.vector.x
-        last_vel_cmd[1] = velocity_setpoint.vector.y
-        last_vel_cmd[2] = velocity_setpoint.vector.z
-        last_acc_cmd[0] = attitude_setpoint.vector.x
-        last_acc_cmd[1] = attitude_setpoint.vector.y
-        last_acc_cmd[2] = attitude_setpoint.vector.z
-        last_pqr_cmd[0] = rate_setpoint.vector.x
-        last_pqr_cmd[1] = rate_setpoint.vector.y
-        last_pqr_cmd[2] = rate_setpoint.vector.z
+        current_loop_time = time()
+        delta_time = current_loop_time - last_loop_time
+
+        last_pos_cmd[0] = position_setpoint.vector.x * kcmd_x + (current_position[0] + velocity_setpoint.vector.x * delta_time) * (1-kcmd_x)
+        last_pos_cmd[1] = position_setpoint.vector.y * kcmd_y + (current_position[1] + velocity_setpoint.vector.y * delta_time) * (1-kcmd_y)
+        last_pos_cmd[2] = position_setpoint.vector.z * kcmd_z + (current_position[2] + velocity_setpoint.vector.z * delta_time) * (1-kcmd_z)
+        last_vel_cmd[0] = velocity_setpoint.vector.x * kcmd_vx + (current_velocity[0] + attitude_setpoint.vector.x * delta_time) * (1-kcmd_vx)
+        last_vel_cmd[1] = velocity_setpoint.vector.y * kcmd_vy + (current_velocity[1] + attitude_setpoint.vector.y * delta_time) * (1-kcmd_vy)
+        last_vel_cmd[2] = velocity_setpoint.vector.z * kcmd_vz + (current_velocity[2] + (attitude_setpoint.vector.z - 9.81) * delta_time) * (1-kcmd_vz)
+        last_acc_cmd[0] = attitude_setpoint.vector.x * kcmd_ax + (current_acc[0]) * (1-kcmd_ax)
+        last_acc_cmd[1] = attitude_setpoint.vector.y * kcmd_ay + (current_acc[1]) * (1-kcmd_ay)
+        last_acc_cmd[2] = attitude_setpoint.vector.z * kcmd_az + (current_acc[2]) * (1-kcmd_az)
+        last_pqr_cmd[0] = rate_setpoint.vector.x * kcmd_qx + (current_rate[0]) * (1-kcmd_qx)
+        last_pqr_cmd[1] = rate_setpoint.vector.y * kcmd_qy + (current_rate[1]) * (1-kcmd_qx)
+        last_pqr_cmd[2] = rate_setpoint.vector.z * kcmd_qz + (current_rate[2]) * (1-kcmd_qx)
+
+        last_loop_time = current_loop_time
 
         rate.sleep()
