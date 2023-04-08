@@ -22,7 +22,7 @@ is_ready = 0
 ros_freq = 30.0
 
 last_time = time()
-
+#change length to change filtered statisics
 last_pos_cmd = np.zeros(2,3)
 last_vel_cmd = np.zeros(2,3)
 last_acc_cmd = np.zeros(2,3)
@@ -47,15 +47,15 @@ kqz = np.zeros(2)
 kx = [0,0.3,0,7]
 ky = [0,0.3,0,7]
 kz = [0,0.3,0.7]
-kvx = [0.1,0.3,0.6]
-kvy = [0.1,0.3,0.6]
-kvz = [0.1,0.3,0.6]
-kax = [0.4,0.2,0.4]
-kay = [0.4,0.2,0.4]
-kaz = [0.4,0.2,0.4]
-kqx = [0.4,0.2,0.4]
-kqy = [0.4,0.2,0.4]
-kqz = [0.4,0.2,0.4]
+kvx = [0.2,0.3,0.5]
+kvy = [0.2,0.3,0.5]
+kvz = [0.2,0.3,0.5]
+kax = [0.2,0.4,0.4]
+kay = [0.2,0.4,0.4]
+kaz = [0.2,0.4,0.4]
+kqx = [0.2,0.4,0.4]
+kqy = [0.2,0.4,0.4]
+kqz = [0.2,0.4,0.4]
 
 #kx = 1
 #ky = 1
