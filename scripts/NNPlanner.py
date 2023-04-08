@@ -41,8 +41,8 @@ def status_cb(data):
     
 if __name__ == "__main__":
 
-    waypoint0 = np.array([0.15, 0.15, 1.1])
-    waypoint1 = np.array([0.3, 0.0, 1.0])
+    waypoint0 = np.array([2.0, 0.5, 1.3])
+    waypoint1 = np.array([4.0, 0.0, 1.0])
     current_lambda = [1, 1]
 
     rospy.init_node("planner")
@@ -63,8 +63,8 @@ if __name__ == "__main__":
 
     rate = rospy.Rate(ros_freq)
 
-    model = keras.models.load_model('/home/zhoujin/learning/model/quad_gx.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    val = keras.models.load_model('/home/zhoujin/learning/model/val_gx.h5')
+    model = keras.models.load_model('/home/zhoujin/learning/model/quad5_m5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    val = keras.models.load_model('/home/zhoujin/learning/model/quad5_val.h5')
     # dataset = loadtxt('/home/zhoujin/trajectory-generation/trajectory/quad2.txt', delimiter=',')
     # split into input (X) and output (y) variables
     # model = keras.models.load_model('/home/zhoujin/learning/model/model1')
