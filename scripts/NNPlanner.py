@@ -22,7 +22,7 @@ is_ready = 0
 ros_freq = 30.0
 
 last_time = time()
-#change length to change filtered statisics
+
 last_pos_cmd = np.zeros((2,3))
 last_vel_cmd = np.zeros((2,3))
 last_acc_cmd = np.zeros((2,3))
@@ -42,21 +42,19 @@ kaz = np.zeros(2)
 kqx = np.zeros(2)
 kqy = np.zeros(2)
 kqz = np.zeros(2)
-
-# 
-kx = [0,0.3,0,7]
-ky = [0,0.3,0,7]
+ 
+kx = [0,0.3,0.7]
+ky = [0,0.3,0.7]
 kz = [0,0.3,0.7]
-kvx = [0.2,0.3,0.5]
-kvy = [0.2,0.3,0.5]
-kvz = [0.2,0.3,0.5]
+kvx = [0.1,0.3,0.6]
+kvy = [0.1,0.3,0.6]
+kvz = [0.1,0.3,0.6]
 kax = [0.2,0.4,0.4]
 kay = [0.2,0.4,0.4]
 kaz = [0.2,0.4,0.4]
 kqx = [0.2,0.4,0.4]
 kqy = [0.2,0.4,0.4]
 kqz = [0.2,0.4,0.4]
-
 #kx = 1
 #ky = 1
 #kz = 1
@@ -155,9 +153,9 @@ if __name__ == "__main__":
             velocity_setpoint.header.stamp = rospy.Time.now()
             velocity_planner_pub.publish(velocity_setpoint)
 
-            attitude_setpoint.vector.x = + output[0, 9] * kax[len(kax)-1]
-            attitude_setpoint.vector.y = + output[0, 10] * kay[len(kax)-1]
-            attitude_setpoint.vector.z = + output[0, 11] * kaz[len(kax)-1]
+            attitude_setpoint.vector.x = output[0, 9] * kax[len(kax)-1]
+            attitude_setpoint.vector.y = output[0, 10] * kay[len(kax)-1]
+            attitude_setpoint.vector.z = output[0, 11] * kaz[len(kax)-1]
             for i in range(len(kax)-1):
                 attitude_setpoint.vector.x += last_acc_cmd[i,0] * kax[i] 
                 attitude_setpoint.vector.y += last_acc_cmd[i,1] * kay[i] 
