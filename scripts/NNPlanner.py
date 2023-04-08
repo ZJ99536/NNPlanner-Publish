@@ -23,25 +23,39 @@ ros_freq = 30.0
 
 last_time = time()
 
-last_pos_cmd = np.zeros(3)
-last_vel_cmd = np.zeros(3)
-last_acc_cmd = np.zeros(3)
-last_pqr_cmd = np.zeros(3)
+last_pos_cmd = np.zeros(2,3)
+last_vel_cmd = np.zeros(2,3)
+last_acc_cmd = np.zeros(2,3)
+last_pqr_cmd = np.zeros(2,3)
 
 flag = 1
 
-kx = 0.7
-ky = 0.7
-kz = 0.7
-kvx = 0.6
-kvy = 0.6
-kvz = 0.6
-kax = 0.4
-kay = 0.4
-kaz = 0.4
-kqx = 0.4
-kqy = 0.4
-kqz = 0.4
+kx = np.zeros(2)
+ky = np.zeros(2)
+kz = np.zeros(2)
+kvx = np.zeros(2)
+kvy = np.zeros(2)
+kvz = np.zeros(2)
+kax = np.zeros(2)
+kay = np.zeros(2)
+kaz = np.zeros(2)
+kqx = np.zeros(2)
+kqy = np.zeros(2)
+kqz = np.zeros(2)
+
+# 
+kx = [0,0.3,0,7]
+ky = [0,0.3,0,7]
+kz = [0,0.3,0.7]
+kvx = [0.1,0.3,0.6]
+kvy = [0.1,0.3,0.6]
+kvz = [0.1,0.3,0.6]
+kax = [0.4,0.2,0.4]
+kay = [0.4,0.2,0.4]
+kaz = [0.4,0.2,0.4]
+kqx = [0.4,0.2,0.4]
+kqy = [0.4,0.2,0.4]
+kqz = [0.4,0.2,0.4]
 
 #kx = 1
 #ky = 1
@@ -121,28 +135,44 @@ if __name__ == "__main__":
         output = model(input.reshape(-1,15))
 
         if is_ready:
-            position_setpoint.vector.x = last_pos_cmd[0] + (((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2 - last_pos_cmd[0]) * kx
-            position_setpoint.vector.y = last_pos_cmd[1] + (((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2 - last_pos_cmd[1]) * ky
-            position_setpoint.vector.z = last_pos_cmd[2] + (((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2 - last_pos_cmd[2]) * kz
+            position_setpoint.vector.x = (((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2) * kx[len(kx)-1]
+            position_setpoint.vector.y = (((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2) * ky[len(kx)-1]
+            position_setpoint.vector.z = (((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2) * kz[len(kx)-1]
+            for i in range(len(kx)-1):
+                position_setpoint.vector.x += last_pos_cmd[i,0] * kx[i] 
+                position_setpoint.vector.y += last_pos_cmd[i,1] * ky[i] 
+                position_setpoint.vector.z += last_pos_cmd[i,2] * kz[i] 
             position_setpoint.header.stamp = rospy.Time.now()
             position_planner_pub.publish(position_setpoint)
 
-            velocity_setpoint.vector.x = last_vel_cmd[0] + (output[0, 6] - last_vel_cmd[0]) * kvx
-            velocity_setpoint.vector.y = last_vel_cmd[1] + (output[0, 7] - last_vel_cmd[1]) * kvy
-            velocity_setpoint.vector.z = last_vel_cmd[2] + (output[0, 8] - last_vel_cmd[2]) * kvz
+            velocity_setpoint.vector.x = output[0, 6] * kvx[len(kvx)-1]
+            velocity_setpoint.vector.y = output[0, 7] * kvy[len(kvx)-1]
+            velocity_setpoint.vector.z = output[0, 8] * kvz[len(kvx)-1]
+            for i in range(len(kvx)-1):
+                velocity_setpoint.vector.x += last_vel_cmd[i,0] * kvx[i] 
+                velocity_setpoint.vector.y += last_vel_cmd[i,1] * kvy[i] 
+                velocity_setpoint.vector.z += last_vel_cmd[i,2] * kvz[i] 
             velocity_setpoint.header.stamp = rospy.Time.now()
             velocity_planner_pub.publish(velocity_setpoint)
 
-            attitude_setpoint.vector.x = last_acc_cmd[0] + (output[0, 9] - last_acc_cmd[0]) * kax
-            attitude_setpoint.vector.y = last_acc_cmd[1] + (output[0, 10] - last_acc_cmd[1]) * kay
-            attitude_setpoint.vector.z = last_acc_cmd[2] + (output[0, 11] - last_acc_cmd[2]) * kaz
+            attitude_setpoint.vector.x = + output[0, 9] * kax[len(kax)-1]
+            attitude_setpoint.vector.y = + output[0, 10] * kay[len(kax)-11]
+            attitude_setpoint.vector.z = + output[0, 11] * kaz[len(kax)-1]
+            for i in range(len(kax)-1):
+                attitude_setpoint.vector.x += last_acc_cmd[i,0] * kax[i] 
+                attitude_setpoint.vector.y += last_acc_cmd[i,1] * kay[i] 
+                attitude_setpoint.vector.z += last_acc_cmd[i,2] * kaz[i] 
             attitude_setpoint.header.stamp = rospy.Time.now()
             attitude_planner_pub.publish(attitude_setpoint)
 
 
-            rate_setpoint.vector.x = last_pqr_cmd[0] + (output[0, 12] - last_pqr_cmd[0]) * kqx
-            rate_setpoint.vector.y = last_pqr_cmd[1] + (output[0, 13] - last_pqr_cmd[1]) * kqy
-            rate_setpoint.vector.z = last_pqr_cmd[2] + (output[0, 14] - last_pqr_cmd[2]) * kqz
+            rate_setpoint.vector.x = output[0, 12] * kqx[len(kqx)-1]
+            rate_setpoint.vector.y = output[0, 13] * kqy[len(kqx)-1]
+            rate_setpoint.vector.z = output[0, 14] * kqz[len(kqx)-1]
+            for i in range(len(kqx)-1):
+                rate_setpoint.vector.x += last_pqr_cmd[i,0] * kqx[i] 
+                rate_setpoint.vector.y += last_pqr_cmd[i,1] * kqy[i] 
+                rate_setpoint.vector.z += last_pqr_cmd[i,2] * kqz[i] 
             rate_setpoint.header.stamp = rospy.Time.now()
             rate_planner_pub.publish(rate_setpoint)
         
@@ -185,17 +215,30 @@ if __name__ == "__main__":
             rate_planner_pub.publish(rate_setpoint)
 
         
-        last_pos_cmd[0] = position_setpoint.vector.x
-        last_pos_cmd[1] = position_setpoint.vector.y
-        last_pos_cmd[2] = position_setpoint.vector.z
-        last_vel_cmd[0] = velocity_setpoint.vector.x
-        last_vel_cmd[1] = velocity_setpoint.vector.y
-        last_vel_cmd[2] = velocity_setpoint.vector.z
-        last_acc_cmd[0] = attitude_setpoint.vector.x
-        last_acc_cmd[1] = attitude_setpoint.vector.y
-        last_acc_cmd[2] = attitude_setpoint.vector.z
-        last_pqr_cmd[0] = rate_setpoint.vector.x
-        last_pqr_cmd[1] = rate_setpoint.vector.y
-        last_pqr_cmd[2] = rate_setpoint.vector.z
+        last_pos_cmd[0,0] = last_pos_cmd[1,0]
+        last_pos_cmd[0,1] = last_pos_cmd[1,1]
+        last_pos_cmd[0,2] = last_pos_cmd[1,2]
+        last_vel_cmd[0,0] = last_vel_cmd[1,0]
+        last_vel_cmd[0,1] = last_vel_cmd[1,1]
+        last_vel_cmd[0,2] = last_vel_cmd[1,2]
+        last_acc_cmd[0,0] = last_acc_cmd[1,0]
+        last_acc_cmd[0,1] = last_acc_cmd[1,1]
+        last_acc_cmd[0,2] = last_acc_cmd[1,2]
+        last_pqr_cmd[0,0] = last_pqr_cmd[1,0]
+        last_pqr_cmd[0,1] = last_pqr_cmd[1,1]
+        last_pqr_cmd[0,2] = last_pqr_cmd[1,2]
+
+        last_pos_cmd[1,0] = position_setpoint.vector.x
+        last_pos_cmd[1,1] = position_setpoint.vector.y
+        last_pos_cmd[1,2] = position_setpoint.vector.z
+        last_vel_cmd[1,0] = velocity_setpoint.vector.x
+        last_vel_cmd[1,1] = velocity_setpoint.vector.y
+        last_vel_cmd[1,2] = velocity_setpoint.vector.z
+        last_acc_cmd[1,0] = attitude_setpoint.vector.x
+        last_acc_cmd[1,1] = attitude_setpoint.vector.y
+        last_acc_cmd[1,2] = attitude_setpoint.vector.z
+        last_pqr_cmd[1,0] = rate_setpoint.vector.x
+        last_pqr_cmd[1,1] = rate_setpoint.vector.y
+        last_pqr_cmd[1,2] = rate_setpoint.vector.z
 
         rate.sleep()
