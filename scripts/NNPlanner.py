@@ -23,10 +23,10 @@ ros_freq = 30.0
 
 last_time = time()
 #change length to change filtered statisics
-last_pos_cmd = np.zeros(2,3)
-last_vel_cmd = np.zeros(2,3)
-last_acc_cmd = np.zeros(2,3)
-last_pqr_cmd = np.zeros(2,3)
+last_pos_cmd = np.zeros((2,3))
+last_vel_cmd = np.zeros((2,3))
+last_acc_cmd = np.zeros((2,3))
+last_pqr_cmd = np.zeros((2,3))
 
 flag = 1
 
