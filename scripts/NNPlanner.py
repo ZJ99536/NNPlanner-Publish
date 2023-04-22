@@ -36,15 +36,15 @@ ros_freq = 30.0
 
 def position_cb(data):
     global current_position
-    current_position = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z])
+    current_position = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z])
    
 def velocity_cb(data):
    global current_velocity
-   current_velocity = np.array([data.twist.twist.linear.x,data.twist.twist.linear.y,data.twist.twist.linear.z])
+   current_velocity = np.array([data.twist.linear.x,data.twist.linear.y,data.twist.linear.z])
 
 def acc_cb(data):
    global current_acc
-   current_acc = np.array([data.twist.twist.linear.x,data.twist.twist.linear.y,data.twist.twist.linear.z])
+   current_acc = np.array([data.twist.linear.x,data.twist.linear.y,data.twist.linear.z])
 
 def rate_cb(data):
     global current_rate
