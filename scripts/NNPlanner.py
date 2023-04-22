@@ -7,7 +7,8 @@ from sklearn.preprocessing import MinMaxScaler
 import rospy
 from std_msgs.msg import  Bool
 from nav_msgs.msg import Odometry 
-from geometry_msgs.msg import Vector3Stamped
+from geometry_msgs.msg import PoseStamped,Vector3Stamped,TwistStamped
+from sensor_msgs.msg import Imu
 import numpy as np
 
 current_position = np.zeros(3)
@@ -20,19 +21,34 @@ is_ready = 0
 
 ros_freq = 30.0
 
-def odometry_cb(data):
+# def odometry_cb(data):
+#     global current_position
+#     current_position = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z])
+#     global current_velocity
+#     current_velocity = np.array([data.twist.twist.linear.x,data.twist.twist.linear.y,data.twist.twist.linear.z])
+#     global current_rate
+#     current_rate = np.array([data.twist.twist.angular.x,data.twist.twist.angular.y,data.twist.twist.angular.z])
+#     global current_acc
+#     global last_velocity
+#     current_acc = (current_velocity - last_velocity) * ros_freq
+#     current_acc[2] += 9.81
+#     last_velocity = current_velocity
+
+def position_cb(data):
     global current_position
     current_position = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z])
-    global current_velocity
-    current_velocity = np.array([data.twist.twist.linear.x,data.twist.twist.linear.y,data.twist.twist.linear.z])
-    global current_rate
-    current_rate = np.array([data.twist.twist.angular.x,data.twist.twist.angular.y,data.twist.twist.angular.z])
-    global current_acc
-    global last_velocity
-    current_acc = (current_velocity - last_velocity) * ros_freq
-    current_acc[2] += 9.81
-    last_velocity = current_velocity
+   
+def velocity_cb(data):
+   global current_velocity
+   current_velocity = np.array([data.twist.twist.linear.x,data.twist.twist.linear.y,data.twist.twist.linear.z])
 
+def acc_cb(data):
+   global current_acc
+   current_acc = np.array([data.twist.twist.linear.x,data.twist.twist.linear.y,data.twist.twist.linear.z])
+
+def rate_cb(data):
+    global current_rate
+    current_rate = np.array([data.angular_velocity.x, -data.angular_velocity.y, -data.angular_velocity.z])
 
 def status_cb(data):
     global is_ready
@@ -47,7 +63,12 @@ if __name__ == "__main__":
 
     rospy.init_node("planner")
 
-    odom_sub = rospy.Subscriber('/uav0/mavros/local_position/odom',Odometry,odometry_cb)
+    # odom_sub = rospy.Subscriber('/uav0/mavros/local_position/odom',Odometry,odometry_cb)
+    position_sub = rospy.Subscriber('/outer_position', PoseStamped,position_cb)
+    velocity_sub = rospy.Subscriber('/outer_velocity', TwistStamped,velocity_cb)
+    acc_sub = rospy.Subscriber('/outer_acc', TwistStamped,acc_cb)
+    rate_sub = rospy.Subscriber('/mavros/imu/data', Imu, rate_cb)
+    # position_sub = rospy.Subscriber('/outer_position', PoseStamped,position_cb)
     status_sub = rospy.Subscriber('/offb_node/status',Bool,status_cb)
 
     position_planner_pub = rospy.Publisher('planner/position', Vector3Stamped, queue_size=1)
