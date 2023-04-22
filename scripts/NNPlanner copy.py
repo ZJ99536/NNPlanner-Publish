@@ -3,13 +3,12 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Normalization
 from tensorflow import keras
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
 import rospy
 from std_msgs.msg import  Bool
 from nav_msgs.msg import Odometry 
 from geometry_msgs.msg import Vector3Stamped
 import numpy as np
-import math
-import time
 
 current_position = np.zeros(3)
 current_velocity = np.zeros(3)
@@ -19,7 +18,7 @@ current_acc[2] = 9.81
 current_rate = np.zeros(3)
 is_ready = 0
 
-ros_freq = 30.0
+ros_freq = 35.0
 
 def odometry_cb(data):
     global current_position
@@ -39,40 +38,18 @@ def status_cb(data):
     global is_ready
     is_ready = data.data
 
-import subprocess
-import os
-import numpy as np
-
-def main1(path,argv):
-    if os.path.exists(path):
-        ret = subprocess.run(path+' '+argv,shell=True,capture_output=True)
-        # print('main1 return {}'.format(ret))
-
-        #0-14 output 15 running time 
-        output = ret.stdout.decode('utf-8').split()
-        
-        # print("ret.stdout "+output)
-        # print(ret.stdout.decode('utf-8'))
-        # print('ret.stderr'+ret.stderr)
-    return output
-
     
 if __name__ == "__main__":
-    
 
-    waypoint0 = np.array([2.0, 0.5, 1.5])
-    waypoint1 = np.array([4.0, 0.0, 1.0])
+    waypoint0 = np.array([2.0, -0.5, 2.3])
+    waypoint1 = np.array([4.0, 0.0, 2.0])
     current_lambda = [1, 1]
-    if is_ready == False:
-        time_start = time.time()
-    k_waypoint0 = np.array([0,0.5,0])
-    time_sum= 0
 
     rospy.init_node("planner")
 
     odom_sub = rospy.Subscriber('/uav0/mavros/local_position/odom',Odometry,odometry_cb)
     status_sub = rospy.Subscriber('/offb_node/status',Bool,status_cb)
-    
+
     position_planner_pub = rospy.Publisher('planner/position', Vector3Stamped, queue_size=1)
     position_setpoint = Vector3Stamped()
     velocity_planner_pub = rospy.Publisher('planner/velocity', Vector3Stamped, queue_size=1)
@@ -86,13 +63,9 @@ if __name__ == "__main__":
 
     rate = rospy.Rate(ros_freq)
 
-    model = keras.models.load_model('/home/leo/BP-training/model/quad5_m5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    val = keras.models.load_model('/home/leo/BP-training/model/quad5_val.h5')
+    model = keras.models.load_model('/home/zhoujin/learning/model/quad3_m2.h5')
     # dataset = loadtxt('/home/zhoujin/trajectory-generation/trajectory/quad2.txt', delimiter=',')
     # split into input (X) and output (y) variables
-    # model = keras.models.load_model('/home/zhoujin/learning/model/model1')
-    # input_test = np.ones(15)
-    # print(model(input_test.reshape(-1,15)))
 
     # X = dataset[:,0:15]
     # y = dataset[:,18:36]
@@ -109,71 +82,38 @@ if __name__ == "__main__":
     # y = min_max_scaler.transform(y)
 
     while not rospy.is_shutdown():
-        # print(current_position)
-        if is_ready == False:
-            time_end = time.time()    
-            time_sum=(time_end - time_start)+time_sum 
-            time_start = time.time() 
-            waypoint0 = np.array([2.0 ,  0.5 * k_waypoint0[1] * math.cos(time_sum), 1.5 ])
-        print(waypoint0)
+        # message.data = "pub message to sub " +str(count)
+        # pub.publish(message)
+        # rospy.loginfo("pub message it is : %s",message.data)
+        # current_position[0] = 1.0
+        # current_position[1] = 1.0
+        # current_position[2] = 2.1
+        # is_ready = 0
+
         input = np.zeros(15)
-        input_val = np.zeros(6)
+        # print(current_position)
         error0 = waypoint0 - current_position
         error1 = waypoint1 - current_position
         for i in range(3):
             input[i] = error0[i]
             input[i+3] = error1[i]
-            input_val[i] = error0[i]
-            input_val[i+3] = error1[i]
             input[i+6] = current_velocity[i]
             input[i+9] = current_acc[i]
             input[i+12] = current_rate[i]
         # input[6] = current_lambda[0]
         # input[7] = current_lambda[1]
         # print(input[0])
- 
-
-        # output = model(input.reshape(-1,15))
-
-        output = np.zeros((1,15))
-        path='/home/leo/keras2cpp/build/keras2cpp'
-        argv = str('')
-        # # input=2, 0.5, 1, 4, 0, 0, 0, 0, 0, 0, 0, 9.81, 0, 0, 0
-        # print(len(input))
-        for i in range(len(input)):        
-            argv += str(input[i])+' '
-        # #0-14 output 15 running time 
-        ret = main1(path,argv) 
-        for i in range(15):
-            output[0,i]= ret[i]
-            # print(output[0,i])
-
-        output_val = val(input_val.reshape(-1,6))
+        output = model(input.reshape(-1,15))
         # output = model.predict(scalerX.transform(input.reshape(-1,15)))
         # output = scalery.inverse_transform(output)
         # print(output[0,1])
-
-        # if output_val[0, 0] > 0.2 :
-        #     position_setpoint.vector.x = ((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2
-        #     position_setpoint.vector.y = ((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2
-        #     position_setpoint.vector.z = ((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2
-        #     position_setpoint.header.stamp = rospy.Time.now()
-        #     position_planner_pub.publish(position_setpoint)
-        #     print(position_setpoint.vector.z)
-        # else:
-        #     position_setpoint.vector.x = waypoint1[0] - output[0, 3]
-        #     position_setpoint.vector.y = waypoint1[1] - output[0, 4]
-        #     position_setpoint.vector.z = waypoint1[2] - output[0, 5]
-        #     position_setpoint.header.stamp = rospy.Time.now()
-        #     position_planner_pub.publish(position_setpoint)
-        #     print(position_setpoint.vector.z)
 
         position_setpoint.vector.x = ((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2
         position_setpoint.vector.y = ((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2
         position_setpoint.vector.z = ((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2
         position_setpoint.header.stamp = rospy.Time.now()
         position_planner_pub.publish(position_setpoint)
-        # print(position_setpoint.vector.z)
+        print(position_setpoint.vector.z)
 
         velocity_setpoint.vector.x = output[0, 6]
         velocity_setpoint.vector.y = output[0, 7]
@@ -186,8 +126,8 @@ if __name__ == "__main__":
         attitude_setpoint.vector.z = output[0, 11]
         attitude_setpoint.header.stamp = rospy.Time.now()
         attitude_planner_pub.publish(attitude_setpoint)
-        # print(current_acc[2])
-        # print(attitude_setpoint.vector.z)
+        print(current_acc[2])
+        print(attitude_setpoint.vector.z)
 
         rate_setpoint.vector.x = output[0, 12]
         rate_setpoint.vector.y = output[0, 13]
@@ -195,9 +135,9 @@ if __name__ == "__main__":
         rate_setpoint.header.stamp = rospy.Time.now()
         rate_planner_pub.publish(rate_setpoint)
         
-        command_setpoint.vector.x = 0
-        command_setpoint.vector.y = output_val[0, 0]
-        command_setpoint.vector.z = output_val[0, 1]
+        command_setpoint.vector.x = output[0, 15]
+        command_setpoint.vector.y = output[0, 16]
+        command_setpoint.vector.z = output[0, 17]
         command_setpoint.header.stamp = rospy.Time.now()
         command_planner_pub.publish(command_setpoint)
         # if is_ready:
