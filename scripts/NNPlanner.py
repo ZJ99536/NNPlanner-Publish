@@ -7,9 +7,10 @@ from sklearn.preprocessing import MinMaxScaler
 import rospy
 from std_msgs.msg import  Bool
 from nav_msgs.msg import Odometry 
-from geometry_msgs.msg import Vector3Stamped
+from geometry_msgs.msg import PoseStamped,Vector3Stamped,TwistStamped
 import numpy as np
 from time import time
+from sensor_msgs.msg import Imu
 
 current_position = np.zeros(3)
 current_velocity = np.zeros(3)
@@ -70,22 +71,34 @@ kqz = [0.2,0.4,0.4]
 
 
 
-def odometry_cb(data):
-    global current_position
-    current_position = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z])
-    global current_velocity
-    current_velocity = np.array([data.twist.twist.linear.x,data.twist.twist.linear.y,data.twist.twist.linear.z])
-    global current_rate
-    current_rate = np.array([data.twist.twist.angular.x,data.twist.twist.angular.y,data.twist.twist.angular.z])
-    global current_acc
-    global last_velocity
-    global last_time
-    current_time = time()
-    current_acc = (current_velocity - last_velocity) / (current_time - last_time)
-    current_acc[2] += 9.81
-    last_velocity = current_velocity
-    last_time = current_time
+# def odometry_cb(data):
+#     global current_position
+#     current_position = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z])
+#     global current_velocity
+#     current_velocity = np.array([data.twist.twist.linear.x,data.twist.twist.linear.y,data.twist.twist.linear.z])
+#     global current_rate
+#     current_rate = np.array([data.twist.twist.angular.x,data.twist.twist.angular.y,data.twist.twist.angular.z])
+#     global current_acc
+#     global last_velocity
+#     current_acc = (current_velocity - last_velocity) * ros_freq
+#     current_acc[2] += 9.81
+#     last_velocity = current_velocity
 
+def position_cb(data):
+    global current_position
+    current_position = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z])
+   
+def velocity_cb(data):
+   global current_velocity
+   current_velocity = np.array([data.twist.linear.x,data.twist.linear.y,data.twist.linear.z])
+
+def acc_cb(data):
+   global current_acc
+   current_acc = np.array([data.twist.linear.x,data.twist.linear.y,data.twist.linear.z])
+
+def rate_cb(data):
+    global current_rate
+    current_rate = np.array([data.angular_velocity.x, -data.angular_velocity.y, -data.angular_velocity.z])
 
 def status_cb(data):
     global is_ready
@@ -100,7 +113,12 @@ if __name__ == "__main__":
 
     rospy.init_node("planner")
 
-    odom_sub = rospy.Subscriber('/mavros/local_position/odom',Odometry,odometry_cb)
+    # odom_sub = rospy.Subscriber('/uav0/mavros/local_position/odom',Odometry,odometry_cb)
+    position_sub = rospy.Subscriber('/outer_position', PoseStamped,position_cb)
+    velocity_sub = rospy.Subscriber('/outer_velocity', TwistStamped,velocity_cb)
+    acc_sub = rospy.Subscriber('/outer_acc', TwistStamped,acc_cb)
+    rate_sub = rospy.Subscriber('/mavros/imu/data', Imu, rate_cb)
+    # position_sub = rospy.Subscriber('/outer_position', PoseStamped,position_cb)
     status_sub = rospy.Subscriber('/offb_node/status',Bool,status_cb)
 
     position_planner_pub = rospy.Publisher('planner/position', Vector3Stamped, queue_size=1)
@@ -115,7 +133,7 @@ if __name__ == "__main__":
 
     rate = rospy.Rate(ros_freq)
 
-    model = keras.models.load_model('/home/nesc/planner_ws/src/NNPlanner-Publish/model/quad5_m5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    model = keras.models.load_model('/home/zhoujin/learning/model/quad5_m5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     
     while not rospy.is_shutdown():
 
