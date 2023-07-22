@@ -44,18 +44,56 @@ kqx = np.zeros(2)
 kqy = np.zeros(2)
 kqz = np.zeros(2)
  
-kx = [0,0.3,0.7]
-ky = [0,0.3,0.7]
-kz = [0,0.3,0.7]
-kvx = [0.1,0.3,0.6]
-kvy = [0.1,0.3,0.6]
-kvz = [0.1,0.3,0.6]
+kx = [0.2,0.3,0.5]
+kx = [0.1,0.3,0.6] #8
+# ky = [0.2,0.3,0.5] #1
+# kz = [0.2,0.3,0.5] #1
+ky = [0.1,0.3,0.6] #2
+kz = [0.1,0.3,0.6] #2
+# ky = [0.15,0.3,0.55] #9
+# kz = [0.1,0.3,0.6] #9
+# ky = [0.0,0.0,1.0] #3
+# kz = [0.0,0.0,1.0] #3
+# ky = [0.1,0.1,0.8] #4
+# kz = [0.1,0.1,0.8] #4
+# kvx = [0.1,0.3,0.6]
+# kvy = [0.1,0.3,0.6]
+# kvz = [0.1,0.3,0.6]
+kvx = [0.2,0.3,0.5]
+kvx = [0.1,0.3,0.6] #8
+# kvy = [0.2,0.3,0.5]
+# kvz = [0.2,0.3,0.5]
+kvy = [0.1,0.3,0.6] #2
+kvz = [0.1,0.3,0.6] #2
+# kvy = [0.0,0.0,1.0] #3
+# kvz = [0.0,0.0,1.0] #3
+# kvy = [0.1,0.1,0.8] #4
+# kvz = [0.1,0.1,0.8] #4
 kax = [0.2,0.4,0.4]
 kay = [0.2,0.4,0.4]
 kaz = [0.2,0.4,0.4]
+# kax = [0.1,0.3,0.6]
+# kay = [0.3,0.3,0.4]
+# kaz = [0.3,0.3,0.4] #12
 kqx = [0.2,0.4,0.4]
 kqy = [0.2,0.4,0.4]
 kqz = [0.2,0.4,0.4]
+
+kx = [0.0,0.0,1.0]
+ky = [0.0,0.0,1.0]
+kz = [0.0,0.0,1.0]
+kvx = [0.0,0.0,1.0]
+kvy = [0.0,0.0,1.0]
+kvz = [0.0,0.0,1.0]
+kax = [0.0,0.0,1.0]
+kay = [0.0,0.0,1.0]
+kaz = [0.0,0.0,1.0]
+kqx = [0.0,0.0,1.0]
+kqy = [0.0,0.0,1.0]
+kqz = [0.0,0.0,1.0]
+
+
+
 #kx = 1
 #ky = 1
 #kz = 1
@@ -133,7 +171,7 @@ if __name__ == "__main__":
 
     rate = rospy.Rate(ros_freq)
 
-    model = keras.models.load_model('/home/zhoujin/learning/model/quad5_m5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    model = keras.models.load_model('/home/zhoujin/learning/model/quad5_t3.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     
     while not rospy.is_shutdown():
 
@@ -153,7 +191,9 @@ if __name__ == "__main__":
         if is_ready:
             position_setpoint.vector.x = (((waypoint0[0] - output[0, 0]) + (waypoint1[0] - output[0, 3])) / 2) * kx[len(kx)-1]
             position_setpoint.vector.y = (((waypoint0[1] - output[0, 1]) + (waypoint1[1] - output[0, 4])) / 2) * ky[len(kx)-1]
+            # if (((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2) > 0:
             position_setpoint.vector.z = (((waypoint0[2] - output[0, 2]) + (waypoint1[2] - output[0, 5])) / 2) * kz[len(kx)-1]
+            
             for i in range(len(kx)-1):
                 position_setpoint.vector.x += last_pos_cmd[i,0] * kx[i] 
                 position_setpoint.vector.y += last_pos_cmd[i,1] * ky[i] 
