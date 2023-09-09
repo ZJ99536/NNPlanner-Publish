@@ -20,7 +20,7 @@ current_acc[2] = 9.81
 current_rate = np.zeros(3)
 is_ready = 0
 
-ros_freq = 30.0
+ros_freq = 33.0
 
 last_time = time()
 
@@ -144,7 +144,7 @@ def position_cb(data):
         p_init = rospy.Time.now()
         p_flag = 0
     time_now = (rospy.Time.now() - p_init).to_sec()
-    if time_now > 0.0:
+    if time_now > 0.00:
         data = p_queue[0]
         p_queue.pop(0)
         current_position = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z])
@@ -159,7 +159,7 @@ def velocity_cb(data):
         v_init = rospy.Time.now()
         v_flag = 0
     time_now = (rospy.Time.now() - v_init).to_sec()
-    if time_now > 0.0:
+    if time_now > 0.00:
         data = v_queue[0]
         v_queue.pop(0)   
         current_velocity = np.array([data.twist.linear.x,data.twist.linear.y,data.twist.linear.z])
@@ -174,7 +174,7 @@ def acc_cb(data):
         a_init = rospy.Time.now()
         a_flag = 0
     time_now = (rospy.Time.now() - a_init).to_sec()
-    if time_now > 0.0:
+    if time_now > 0.00:
         data = a_queue[0]
         a_queue.pop(0) 
     current_acc = np.array([data.twist.linear.x,data.twist.linear.y,data.twist.linear.z])
@@ -189,7 +189,7 @@ def rate_cb(data):
         q_init = rospy.Time.now()
         q_flag = 0
     time_now = (rospy.Time.now() - q_init).to_sec()
-    if time_now > 0.0:
+    if time_now > 0.00:
         data = q_queue[0]
         q_queue.pop(0) 
     current_rate = np.array([data.angular_velocity.x, -data.angular_velocity.y, -data.angular_velocity.z])
@@ -201,8 +201,8 @@ def status_cb(data):
     
 if __name__ == "__main__":
 
-    waypoint0 = np.array([0.5, 1.5, 1.4])
-    waypoint1 = np.array([3.5, 0.5, 1.0])
+    waypoint0 = np.array([0.0, 1.0, 1.4])
+    waypoint1 = np.array([3.0, 0.0, 1.0])
     current_lambda = [1, 1]
 
     rospy.init_node("planner")
@@ -236,47 +236,18 @@ if __name__ == "__main__":
     # model = keras.models.load_model('/home/zhoujin/learning/model/quad_FB.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     # model = keras.models.load_model('/home/zhoujin/learning/model/quad5_m5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     # model = keras.models.load_model('/home/zhoujin/learning/model/quad2_ALL.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    model0 = keras.models.load_model('/home/zhoujin/learning/model/quad2_8m.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    model1 = keras.models.load_model('/home/zhoujin/learning/model/quadb2_8m.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    # model0 = keras.models.load_model('/home/zhoujin/learning/model/quad_FB.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    # model1 = keras.models.load_model('/home/zhoujin/learning/model/quadm2_75t2.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    model = keras.models.load_model('/home/zhoujin/learning/model/quad2_8m.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     status = 0
     while not rospy.is_shutdown():
         if status == 0 :
-            model = model0
             waypoint0 = np.array([0.0, 1.0, 1.4])
             waypoint1 = np.array([3.0, 0.0, 1.0])
             error = waypoint1 - current_position
-            if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
-                status = 1
-            if current_position[0] > 2.0:
-                status = 1
+            if error[0]**2 + error[1]**2 + error[2]**2 < 0.06:
+                status = 0
         if status == 1 :
-            model = model1
-            waypoint0 = np.array([0.0, -1.0, 0.6])
-            waypoint1 = np.array([-3.0, 0.0, 1.0])
-            error = waypoint1 - current_position
-            if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
-                status = 2
-            if current_position[0] < -1.5:
-                status = 2
-        if status == 2 :
-            model = model0
-            waypoint0 = np.array([0.0, 1.0, 1.5])
-            waypoint1 = np.array([3.0, 0.0, 1.0])  
-            error = waypoint1 - current_position
-            if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
-                status = 3
-            if current_position[0] > 2.0:
-                status = 3
-        if status == 3 :
-            model = model1
-            waypoint0 = np.array([0.0, -1.0, 0.5])
-            waypoint1 = np.array([-3.0, -2.0, 1.0])
-            error = waypoint1 - current_position
-            if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
-                status = 3
-
+            waypoint0 = np.array([0.0, 0.5, 1.3])
+            waypoint1 = np.array([2.0, 0.0, 1.0])
         status_setpoint.vector.x = status
         status_setpoint.header.stamp = rospy.Time.now()
         status_planner_pub.publish(status_setpoint)

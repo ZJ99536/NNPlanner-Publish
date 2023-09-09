@@ -11,6 +11,7 @@ from geometry_msgs.msg import PoseStamped,Vector3Stamped,TwistStamped
 import numpy as np
 from time import time
 from sensor_msgs.msg import Imu
+from math import sin
 
 current_position = np.zeros(3)
 current_velocity = np.zeros(3)
@@ -225,6 +226,8 @@ if __name__ == "__main__":
     rate_setpoint = Vector3Stamped()
     status_planner_pub = rospy.Publisher('planner/status', Vector3Stamped, queue_size=1)
     status_setpoint = Vector3Stamped()
+    waypoint_pub = rospy.Publisher('planner/waypoint', Vector3Stamped, queue_size=1)
+    waypoint_setpoint = Vector3Stamped()
 
 
     rate = rospy.Rate(ros_freq)
@@ -241,45 +244,64 @@ if __name__ == "__main__":
     # model0 = keras.models.load_model('/home/zhoujin/learning/model/quad_FB.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     # model1 = keras.models.load_model('/home/zhoujin/learning/model/quadm2_75t2.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     status = 0
+    wpy = 0.0
+    flying_gate = 0.0
+    init_time = rospy.Time.now()
+
     while not rospy.is_shutdown():
+        flying_gate = 1.5 * sin(np.pi*(rospy.Time.now()-init_time).to_sec()/10.0)
+        # if current_position[0] < 0.0:
+        #     wpy = 1.5 * sin(np.pi*(rospy.Time.now()-init_time).to_sec()/10.0)
         if status == 0 :
+            if current_position[0] < -2.8:
+                wpy = flying_gate - 1.0
             model = model0
-            waypoint0 = np.array([0.0, 1.0, 1.4])
-            waypoint1 = np.array([3.0, 0.0, 1.0])
+            waypoint0 = np.array([0.0, wpy, 0.6])
+            waypoint1 = np.array([3.0, 1.0, 1.0])
             error = waypoint1 - current_position
             if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
                 status = 1
-            if current_position[0] > 2.0:
-                status = 1
+            waypoint_setpoint.vector.z = 0.6
+
         if status == 1 :
+            if current_position[0] > 2.8:
+                wpy = flying_gate + 1.0
             model = model1
-            waypoint0 = np.array([0.0, -1.0, 0.6])
-            waypoint1 = np.array([-3.0, 0.0, 1.0])
+            waypoint0 = np.array([0.0, wpy, 1.4])
+            waypoint1 = np.array([-3.0, 1.0, 1.0])
             error = waypoint1 - current_position
             if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
                 status = 2
-            if current_position[0] < -1.5:
-                status = 2
+            waypoint_setpoint.vector.z = 1.4
+
         if status == 2 :
+            if current_position[0] < -2.8:
+                wpy = flying_gate + 1.0
             model = model0
-            waypoint0 = np.array([0.0, 1.0, 1.5])
-            waypoint1 = np.array([3.0, 0.0, 1.0])  
+            waypoint0 = np.array([0.0, wpy, 0.6])
+            waypoint1 = np.array([3.0, -1.0, 1.0])
             error = waypoint1 - current_position
             if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
                 status = 3
-            if current_position[0] > 2.0:
-                status = 3
+            waypoint_setpoint.vector.z = 0.6
+
         if status == 3 :
+            if current_position[0] > 2.8:
+                wpy = flying_gate - 1.0
             model = model1
-            waypoint0 = np.array([0.0, -1.0, 0.5])
-            waypoint1 = np.array([-3.0, -2.0, 1.0])
+            waypoint0 = np.array([0.0, wpy, 1.4])
+            waypoint1 = np.array([-3.0, -1.0, 1.0])
             error = waypoint1 - current_position
-            if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
-                status = 3
+            waypoint_setpoint.vector.z = 1.4
 
         status_setpoint.vector.x = status
         status_setpoint.header.stamp = rospy.Time.now()
         status_planner_pub.publish(status_setpoint)
+
+        waypoint_setpoint.vector.x = 0.0
+        waypoint_setpoint.vector.y = wpy
+        waypoint_setpoint.header.stamp = rospy.Time.now()
+        waypoint_pub.publish(waypoint_setpoint)
 
         input = np.zeros(15)
         # print(current_position)
