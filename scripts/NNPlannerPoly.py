@@ -243,78 +243,7 @@ def trajPlanning(t, p, v, a):
         kMatrix = np.matmul(np.linalg.inv(tMatrix),xMatrix)
         return kMatrix
 
-def planOnce(tseg0, tseg1, waypoint1,point,velocity,acc):
-    global current_position
-    global current_velocity
-    global current_acc
-    t = np.ones(2)
-    t[0] = tseg0
-    t[1] = tseg1
-    px = np.zeros(3)
-    px[0] = current_position[0]
-    px[1] = waypoint1[0]
-    px[2] = point[0]
-    py = np.zeros(3)
-    py[0] = current_position[1]
-    py[1] = waypoint1[1]
-    py[2] = point[1]
-    pz = np.zeros(3)
-    pz[0] = current_position[2]
-    pz[1] = waypoint1[2]
-    pz[2] = point[2]
-    vx = np.zeros(2)
-    vx[0] = current_velocity[0]
-    vx[1] = velocity[0]
-    vy = np.zeros(2)
-    vy[0] = current_velocity[1]
-    vy[1] = velocity[1]
-    vz = np.zeros(2)
-    vz[0] = current_velocity[2]
-    vz[1] = velocity[2]
-    ax = np.zeros(2)
-    ax[0] = current_acc[0]
-    ax[1] = acc[0]
-    ay = np.zeros(2)
-    ay[0] = current_acc[1]
-    ay[1] = acc[1]
-    az = np.zeros(2)
-    az[0] = current_acc[2]
-    az[1] = acc[2] - 9.81
-    polyx = trajPlanning(t,px,vx,ax)
-    polyy = trajPlanning(t,py,vy,ay)
-    polyz = trajPlanning(t,pz,vz,az)
-    return polyx,polyy,polyz
 
-def predictOnce(point0,waypoint3,waypoint4,limit):
-    point = point0
-    velocity = np.array([0.0, 0.0, 0.0])
-    acc = np.array([0.0, 0.0, 9.81])
-    pqr = np.array([0.0, 0.0, 0.0])
-    while (limit > 0 and point[0] > limit) or (limit < 0 and point[0] < limit):
-        input = np.zeros(15)
-        # print(current_position)
-        error3 = waypoint3 - point
-        error4 = waypoint4 - point
-        for i in range(3):
-            input[i] = error3[i]
-            input[i+3] = error4[i]
-            input[i+6] = velocity[i]
-            input[i+9] = acc[i]
-            input[i+12] = pqr[i]
-        output = model1(input.reshape(-1,15))
-        point[0] = (((waypoint3[0] - output[0, 0]) + (waypoint4[0] - output[0, 3])) / 2)
-        point[1] = (((waypoint3[1] - output[0, 1]) + (waypoint4[1] - output[0, 4])) / 2)
-        point[2] = (((waypoint3[2] - output[0, 2]) + (waypoint4[2] - output[0, 5])) / 2)
-        velocity[0] = output[0, 6]
-        velocity[1] = output[0, 7]
-        velocity[2] = output[0, 8]
-        acc[0] = output[0, 9]
-        acc[1] = output[0, 10]
-        acc[2] = output[0, 11]
-        pqr[0] = output[0, 12]
-        pqr[1] = output[0, 13]
-        pqr[2] = output[0, 14]
-    return point,velocity,acc
 
     
 if __name__ == "__main__":
@@ -355,25 +284,64 @@ if __name__ == "__main__":
 
     rate = rospy.Rate(ros_freq)
 
+    # model = keras.models.load_model('/home/zhoujin/learning/model/quad5_t3.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    # model = keras.models.load_model('/home/zhoujin/learning/model/quad2_5t2.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    # model = keras.models.load_model('/home/zhoujin/learning/model/quad4_75t2.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    # model = keras.models.load_model('/home/zhoujin/learning/model/quadback_75t2.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    # model = keras.models.load_model('/home/zhoujin/learning/model/quad_FB.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    # model = keras.models.load_model('/home/zhoujin/learning/model/quad5_m5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    # model = keras.models.load_model('/home/zhoujin/learning/model/quad2_ALL.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     model0 = keras.models.load_model('/home/zhoujin/learning/model/quad2_8m.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     model1 = keras.models.load_model('/home/zhoujin/learning/model/quadb2_8m.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    
+    # model0 = keras.models.load_model('/home/zhoujin/learning/model/quad_FB.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    # model1 = keras.models.load_model('/home/zhoujin/learning/model/quadm2_75t2.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     status = 0
 
-    point0,velocity0,acc0 = predictOnce(np.array([3.0, 0.0, 1.0]),np.array([0.0, -1.0, 0.6]),np.array([-3.0, 0.0, 1.0]),2.0)
-    point1,velocity1,acc1 = predictOnce(np.array([-3.0, 0.0, 1.0]),np.array([0.0, 1.0, 1.5]),np.array([3.0, 0.0, 1.0]),-2.0)
-    point2,velocity2,acc2 = predictOnce(np.array([3.0, 0.0, 1.0]),np.array([0.0, -1.0, 0.5]),np.array([-3.0, -2.0, 1.0]),2.0)
-        
+    tseg = 1.0
+
+    point = np.array([3.0, 0.0, 1.0])
+    velocity = np.array([0.0, 0.0, 0.0])
+    acc = np.array([0.0, 0.0, 9.81])
+    pqr = np.array([0.0, 0.0, 0.0])
+    waypoint3 = np.array([0.0, -1.0, 0.6])
+    waypoint4 = np.array([-3.0, 0.0, 1.0]) 
+    while point[0] > 2.0:
+        input = np.zeros(15)
+        # print(current_position)
+        error3 = waypoint3 - point
+        error4 = waypoint4 - point
+        for i in range(3):
+            input[i] = error3[i]
+            input[i+3] = error4[i]
+            input[i+6] = velocity[i]
+            input[i+9] = acc[i]
+            input[i+12] = pqr[i]
+        output = model1(input.reshape(-1,15))
+        point[0] = (((waypoint3[0] - output[0, 0]) + (waypoint4[0] - output[0, 3])) / 2)
+        point[1] = (((waypoint3[1] - output[0, 1]) + (waypoint4[1] - output[0, 4])) / 2)
+        point[2] = (((waypoint3[2] - output[0, 2]) + (waypoint4[2] - output[0, 5])) / 2)
+        velocity[0] = output[0, 6]
+        velocity[1] = output[0, 7]
+        velocity[2] = output[0, 8]
+        acc[0] = output[0, 9]
+        acc[1] = output[0, 10]
+        acc[2] = output[0, 11]
+        pqr[0] = output[0, 12]
+        pqr[1] = output[0, 13]
+        pqr[2] = output[0, 14]
+
+    
     while not rospy.is_shutdown():
         if status == 0 :
             model = model0
             waypoint0 = np.array([0.0, 1.0, 1.4])
             waypoint1 = np.array([3.0, 0.0, 1.0])
             error = waypoint1 - current_position
-            if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
+            # if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
+            #     status = 1
+            if current_position[0] > 2.0:
                 status = 1
-            # if current_position[0] > 2.0:
-            #     status = 1            
+            
         if status == 1 :
             model = model1
             waypoint0 = np.array([0.0, -1.0, 0.6])
@@ -526,30 +494,45 @@ if __name__ == "__main__":
                 if poly_flag[0] :
                     poly_init = rospy.Time.now()
                     poly_flag[0] = 0
-                    ts0 = 1.0
-                    ts1 = 0.5
+                    t = np.ones(2) * tseg
+                    t[1] *= 0.5
                     waypoint1 = np.array([3.0, 0.0, 1.0])
-                    polyx,polyy,polyz = planOnce(ts0,ts1,waypoint1,point0,velocity0,acc0)
-        if status == 1 and current_position[0] < -1.0:
-                if poly_flag[1] :
-                    poly_init = rospy.Time.now()
-                    poly_flag[1] = 0
-                    ts0 = 1.0
-                    ts1 = 0.5
-                    waypoint1 = np.array([-3.0, 0.0, 1.0])
-                    polyx,polyy,polyz = planOnce(ts0,ts1,waypoint1,point1,velocity1,acc1)
-        if status == 2 and current_position[0] > 1.0:
-                if poly_flag[2] :
-                    poly_init = rospy.Time.now()
-                    poly_flag[2] = 0
-                    ts0 = 1.0
-                    ts1 = 0.5
-                    waypoint1 = np.array([3.0, 0.0, 1.0])
-                    polyx,polyy,polyz = planOnce(ts0,ts1,waypoint1,point2,velocity2,acc2)
-
-        if poly_flag[0] == 0:
+                    px = np.zeros(3)
+                    px[0] = current_position[0]
+                    px[1] = waypoint1[0]
+                    px[2] = point[0]
+                    py = np.zeros(3)
+                    py[0] = current_position[1]
+                    py[1] = waypoint1[1]
+                    py[2] = point[1]
+                    pz = np.zeros(3)
+                    pz[0] = current_position[2]
+                    pz[1] = waypoint1[2]
+                    pz[2] = point[2]
+                    vx = np.zeros(2)
+                    vx[0] = current_velocity[0]
+                    vx[1] = velocity[0]
+                    vy = np.zeros(2)
+                    vy[0] = current_velocity[1]
+                    vy[1] = velocity[1]
+                    vz = np.zeros(2)
+                    vz[0] = current_velocity[2]
+                    vz[1] = velocity[2]
+                    ax = np.zeros(2)
+                    ax[0] = current_acc[0]
+                    ax[1] = acc[0]
+                    ay = np.zeros(2)
+                    ay[0] = current_acc[1]
+                    ay[1] = acc[1]
+                    az = np.zeros(2)
+                    az[0] = current_acc[2]
+                    az[1] = acc[2] - 9.81
+                    polyx = trajPlanning(t,px,vx,ax)
+                    polyy = trajPlanning(t,py,vy,ay)
+                    polyz = trajPlanning(t,pz,vz,az)
+        if poly_flag[0] == 0 :
             current_t = (rospy.Time.now() - poly_init).to_sec()
-            if current_t < ts0 :
+            if current_t < tseg :
                 ts = current_t
                 t = np.array([ts**4, ts**3, ts**2, ts, 1])
                 vt = np.array([4*ts**3, 3*ts**2, 2*ts, 1, 0])
@@ -557,8 +540,8 @@ if __name__ == "__main__":
                 aax = np.array([polyx[0],polyx[1],polyx[2],polyx[3],polyx[4]])
                 aay = np.array([polyy[0],polyy[1],polyy[2],polyy[3],polyy[4]])
                 aaz = np.array([polyz[0],polyz[1],polyz[2],polyz[3],polyz[4]])
-            elif current_t < ts0+ts1 :
-                ts = current_t - ts0
+            elif current_t < tseg * 1.5 :
+                ts = current_t - tseg
                 t = np.array([ts**4, ts**3, ts**2, ts, 1])
                 vt = np.array([4*ts**3, 3*ts**2, 2*ts, 1, 0])
                 at = np.array([12*ts**2, 6*ts, 2, 1, 0])
