@@ -93,35 +93,6 @@ kqx = [0.0,0.0,1.0]
 kqy = [0.0,0.0,1.0]
 kqz = [0.0,0.0,1.0]
 
-
-
-#kx = 1
-#ky = 1
-#kz = 1
-#kvx = 1
-#kvy = 1
-#kvz = 1
-#kax = 1
-#kay = 1
-#kaz = 1
-#kqx = 1
-#kqy = 1
-#kqz = 1
-
-
-
-# def odometry_cb(data):
-#     global current_position
-#     current_position = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z])
-#     global current_velocity
-#     current_velocity = np.array([data.twist.twist.linear.x,data.twist.twist.linear.y,data.twist.twist.linear.z])
-#     global current_rate
-#     current_rate = np.array([data.twist.twist.angular.x,data.twist.twist.angular.y,data.twist.twist.angular.z])
-#     global current_acc
-#     global last_velocity
-#     current_acc = (current_velocity - last_velocity) * ros_freq
-#     current_acc[2] += 9.81
-#     last_velocity = current_velocity
 p_init = 0
 v_init = 0
 a_init = 0
@@ -134,6 +105,7 @@ p_queue = []
 v_queue = []
 a_queue = []
 q_queue = []
+
 
 def position_cb(data):
     global current_position
@@ -149,6 +121,14 @@ def position_cb(data):
         data = p_queue[0]
         p_queue.pop(0)
         current_position = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z])
+
+def fg1_cb(data):
+    global fg1_position
+    fg1_position = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z])
+
+def fg2_cb(data):
+    global fg2_position
+    fg2_position = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z])
    
 def velocity_cb(data):
     global current_velocity
@@ -216,6 +196,9 @@ if __name__ == "__main__":
     # position_sub = rospy.Subscriber('/outer_position', PoseStamped,position_cb)
     status_sub = rospy.Subscriber('/offb_node/status',Bool,status_cb)
 
+    fg1_sub = rospy.Subscriber('vrpn_client_node/fangguo1/pose',PoseStamped,fg1_cb)
+    fg2_sub = rospy.Subscriber('vrpn_client_node/fangguo2/pose',PoseStamped,fg2_cb)
+
     position_planner_pub = rospy.Publisher('planner/position', Vector3Stamped, queue_size=1)
     position_setpoint = Vector3Stamped()
     velocity_planner_pub = rospy.Publisher('planner/velocity', Vector3Stamped, queue_size=1)
@@ -247,59 +230,69 @@ if __name__ == "__main__":
     wpy = 0.0
     flying_gate = 0.0
     init_time = rospy.Time.now()
+    wpx = 0.0
+    wpy = 0.0
 
     while not rospy.is_shutdown():
-        flying_gate = 1.5 * sin(np.pi*(rospy.Time.now()-init_time).to_sec()/10.0)
-        # if current_position[0] < 0.0:
-        #     wpy = 1.5 * sin(np.pi*(rospy.Time.now()-init_time).to_sec()/10.0)
         if status == 0 :
-            if current_position[0] < -2.8:
-                wpy = flying_gate - 1.0
+            if current_position[0] < -1.0:
+                wpx = fg1_position[0]
+                wpy = fg1_position[1]
             model = model0
-            waypoint0 = np.array([0.0, wpy, 0.6])
+            waypoint0 = np.array([wpx, wpy, 0.6])
             waypoint1 = np.array([3.0, 1.0, 1.0])
             error = waypoint1 - current_position
             if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
                 status = 1
+            waypoint_setpoint.vector.x = wpx
+            waypoint_setpoint.vector.y = wpy
             waypoint_setpoint.vector.z = 0.6
 
         if status == 1 :
-            if current_position[0] > 2.8:
-                wpy = flying_gate + 1.0
+            if current_position[0] > 1.0:
+                wpx = fg2_position[0]
+                wpy = fg2_position[1]
             model = model1
-            waypoint0 = np.array([0.0, wpy, 1.4])
+            waypoint0 = np.array([wpx, wpy, 1.3])
             waypoint1 = np.array([-3.0, 1.0, 1.0])
             error = waypoint1 - current_position
             if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
                 status = 2
-            waypoint_setpoint.vector.z = 1.4
+            waypoint_setpoint.vector.x = wpx
+            waypoint_setpoint.vector.y = wpy
+            waypoint_setpoint.vector.z = 1.3
 
         if status == 2 :
-            if current_position[0] < -2.8:
-                wpy = flying_gate + 1.0
+            if current_position[0] < -1.0:
+                wpx = fg2_position[0]
+                wpy = fg2_position[1]
             model = model0
-            waypoint0 = np.array([0.0, wpy, 0.6])
+            waypoint0 = np.array([wpx, wpy, 1.3])
             waypoint1 = np.array([3.0, -1.0, 1.0])
             error = waypoint1 - current_position
             if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
                 status = 3
-            waypoint_setpoint.vector.z = 0.6
+            waypoint_setpoint.vector.x = wpx
+            waypoint_setpoint.vector.y = wpy
+            waypoint_setpoint.vector.z = 1.3
 
         if status == 3 :
-            if current_position[0] > 2.8:
-                wpy = flying_gate - 1.0
+            if current_position[0] > 1.0:
+                wpx = fg1_position[0]
+                wpy = fg1_position[1]
             model = model1
-            waypoint0 = np.array([0.0, wpy, 1.4])
+            waypoint0 = np.array([wpx, wpy, 0.6])
             waypoint1 = np.array([-3.0, -1.0, 1.0])
             error = waypoint1 - current_position
-            waypoint_setpoint.vector.z = 1.4
+            waypoint_setpoint.vector.x = wpx
+            waypoint_setpoint.vector.y = wpy
+            waypoint_setpoint.vector.z = 0.6
 
         status_setpoint.vector.x = status
         status_setpoint.header.stamp = rospy.Time.now()
         status_planner_pub.publish(status_setpoint)
 
-        waypoint_setpoint.vector.x = 0.0
-        waypoint_setpoint.vector.y = wpy
+        
         waypoint_setpoint.header.stamp = rospy.Time.now()
         waypoint_pub.publish(waypoint_setpoint)
 

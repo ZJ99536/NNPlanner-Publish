@@ -11,7 +11,6 @@ from geometry_msgs.msg import PoseStamped,Vector3Stamped,TwistStamped
 import numpy as np
 from time import time
 from sensor_msgs.msg import Imu
-from math import sin
 
 current_position = np.zeros(3)
 current_velocity = np.zeros(3)
@@ -199,12 +198,132 @@ def status_cb(data):
     global is_ready
     is_ready = data.data
 
+def trajPlanning(t, p, v, a):
+        xMatrix = np.zeros((4*len(t)+2,1))
+        for i in range(len(p)-1):
+            xMatrix[i,0] = p[i]
+            xMatrix[len(t)+i,0] = p[i+1]
+
+        xMatrix[-4,0] = v[0]
+        xMatrix[-3,0] = a[0]
+        xMatrix[-2,0] = v[1]
+        xMatrix[-1,0] = a[1]
+
+        tMatrix = np.zeros((4*len(t)+2,4*len(t)+2)) 
+        tMatrix[0,4] = 1 #p0(0)
+        tMatrix[len(t)-1,-1] = 1 #pn(0)
+        for j in range(5):
+            tMatrix[len(t),j] = t[0]**(4-j) #p0(t)
+            tMatrix[2*len(t)-1,-1-j] = t[-1]**j #pn(t)
+        # for i in range(1,len(t)-1):
+        #     tMatrix[i,4*(i+1)] = 1 #pi(0)
+        #     for j in range(4):
+        #         tMatrix[len(t)+i,4*i+1+j] = t[i]**(3-j) #pi(t)
+
+        for j in range(5):
+            tMatrix[2*len(t),j] = (4-j)*t[0]**(3-j) #v0(t)            
+            tMatrix[3*len(t)-1,j] = (4-j)*(3-j)*t[0]**(3-j) #a0(t)
+            
+        
+        tMatrix[3*len(t)-2,-2] = -1 #-vn(0)
+        tMatrix[4*len(t)-3,-3] = -2 #-an(0)
+        # for i in range(1,len(t)-1):
+        #     tMatrix[2*len(t)+i-1,4*i+3] = -1 #vi(0)
+        #     tMatrix[3*len(t)+i-2,4*i+2] = -2 #-ai0)
+        #     for j in range(4):
+        #         tMatrix[2*len(t)+i,i*4+j+1] = (3-j)*t[i]**(2-j) #vi(t)
+        #         tMatrix[3*len(t)+i-1,i*4+j+1] = (3-j)*(2-j)*t[i]**(1-j) #vi(t)
+
+        tMatrix[-4,3] = 1 #v0
+        tMatrix[-3,2] = 2 #a0
+        for j in range(5):
+            tMatrix[-2,j-5] = (4-j)*t[-1]**(3-j) #vt
+            tMatrix[-1,j-5] = (4-j)*(3-j)*t[-1]**(2-j) #at
+
+        kMatrix = np.matmul(np.linalg.inv(tMatrix),xMatrix)
+        return kMatrix
+
+def planOnce(tseg0, tseg1, waypoint1,point,velocity,acc):
+    global current_position
+    global current_velocity
+    global current_acc
+    t = np.ones(2)
+    t[0] = tseg0
+    t[1] = tseg1
+    px = np.zeros(3)
+    px[0] = current_position[0]
+    px[1] = waypoint1[0]
+    px[2] = point[0]
+    py = np.zeros(3)
+    py[0] = current_position[1]
+    py[1] = waypoint1[1]
+    py[2] = point[1]
+    pz = np.zeros(3)
+    pz[0] = current_position[2]
+    pz[1] = waypoint1[2]
+    pz[2] = point[2]
+    vx = np.zeros(2)
+    vx[0] = current_velocity[0]
+    vx[1] = velocity[0]
+    vy = np.zeros(2)
+    vy[0] = current_velocity[1]
+    vy[1] = velocity[1]
+    vz = np.zeros(2)
+    vz[0] = current_velocity[2]
+    vz[1] = velocity[2]
+    ax = np.zeros(2)
+    ax[0] = current_acc[0]
+    ax[1] = acc[0]
+    ay = np.zeros(2)
+    ay[0] = current_acc[1]
+    ay[1] = acc[1]
+    az = np.zeros(2)
+    az[0] = current_acc[2]
+    az[1] = acc[2] - 9.81
+    polyx = trajPlanning(t,px,vx,ax)
+    polyy = trajPlanning(t,py,vy,ay)
+    polyz = trajPlanning(t,pz,vz,az)
+    return polyx,polyy,polyz
+
+def predictOnce(point0,waypoint3,waypoint4,limit,model):
+    point = point0
+    velocity = np.array([0.0, 0.0, 0.0])
+    acc = np.array([0.0, 0.0, 9.81])
+    pqr = np.array([0.0, 0.0, 0.0])
+    while (limit > 0 and point[0] > limit) or (limit < 0 and point[0] < limit):
+        input = np.zeros(15)
+        # print(current_position)
+        error3 = waypoint3 - point
+        error4 = waypoint4 - point
+        for i in range(3):
+            input[i] = error3[i]
+            input[i+3] = error4[i]
+            input[i+6] = velocity[i]
+            input[i+9] = acc[i]
+            input[i+12] = pqr[i]
+        output = model(input.reshape(-1,15))
+        point[0] = (((waypoint3[0] - output[0, 0]) + (waypoint4[0] - output[0, 3])) / 2)
+        point[1] = (((waypoint3[1] - output[0, 1]) + (waypoint4[1] - output[0, 4])) / 2)
+        point[2] = (((waypoint3[2] - output[0, 2]) + (waypoint4[2] - output[0, 5])) / 2)
+        velocity[0] = output[0, 6]
+        velocity[1] = output[0, 7]
+        velocity[2] = output[0, 8]
+        acc[0] = output[0, 9]
+        acc[1] = output[0, 10]
+        acc[2] = output[0, 11]
+        pqr[0] = output[0, 12]
+        pqr[1] = output[0, 13]
+        pqr[2] = output[0, 14]
+    return point,velocity,acc
+
     
 if __name__ == "__main__":
 
     waypoint0 = np.array([0.5, 1.5, 1.4])
     waypoint1 = np.array([3.5, 0.5, 1.0])
     current_lambda = [1, 1]
+
+    poly_flag = [1, 1, 1]
 
     rospy.init_node("planner")
 
@@ -226,88 +345,66 @@ if __name__ == "__main__":
     rate_setpoint = Vector3Stamped()
     status_planner_pub = rospy.Publisher('planner/status', Vector3Stamped, queue_size=1)
     status_setpoint = Vector3Stamped()
-    waypoint_pub = rospy.Publisher('planner/waypoint', Vector3Stamped, queue_size=1)
-    waypoint_setpoint = Vector3Stamped()
-    gate_pub = rospy.Publisher('planner/gate', Vector3Stamped, queue_size=1)
-    gate_setpoint = Vector3Stamped()
+    poly_pub = rospy.Publisher('planner/poly', Vector3Stamped, queue_size=1)
+    poly_setpoint = Vector3Stamped()
+    polyv_pub = rospy.Publisher('planner/polyv', Vector3Stamped, queue_size=1)
+    polyv_setpoint = Vector3Stamped()
+    polya_pub = rospy.Publisher('planner/polya', Vector3Stamped, queue_size=1)
+    polya_setpoint = Vector3Stamped()
+    polyflag_pub = rospy.Publisher('planner/flag', Vector3Stamped, queue_size=1)
+    flag_setpoint = Vector3Stamped()
 
 
     rate = rospy.Rate(ros_freq)
 
-    # model = keras.models.load_model('/home/zhoujin/learning/model/quad5_t3.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    # model = keras.models.load_model('/home/zhoujin/learning/model/quad2_5t2.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    # model = keras.models.load_model('/home/zhoujin/learning/model/quad4_75t2.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    # model = keras.models.load_model('/home/zhoujin/learning/model/quadback_75t2.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    # model = keras.models.load_model('/home/zhoujin/learning/model/quad_FB.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    # model = keras.models.load_model('/home/zhoujin/learning/model/quad5_m5.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    # model = keras.models.load_model('/home/zhoujin/learning/model/quad2_ALL.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     model0 = keras.models.load_model('/home/zhoujin/learning/model/quad2_8m.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
     model1 = keras.models.load_model('/home/zhoujin/learning/model/quadb2_8m.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    # model0 = keras.models.load_model('/home/zhoujin/learning/model/quad_FB.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
-    # model1 = keras.models.load_model('/home/zhoujin/learning/model/quadm2_75t2.h5') # quad5 m4 m6(softplus 64) m5(softplus 640)
+    
     status = 0
-    wpy = 0.0
-    flying_gate = 0.0
-    init_time = rospy.Time.now()
 
+    point0,velocity0,acc0 = predictOnce(np.array([3.0, 0.0, 1.0]),np.array([0.0, -1.0, 0.6]),np.array([-3.0, 0.0, 1.0]),1.5,model1)
+    point1,velocity1,acc1 = predictOnce(np.array([-3.0, 0.0, 1.0]),np.array([0.0, 1.0, 1.5]),np.array([3.0, 0.0, 1.0]),-1.7,model0)
+    point2,velocity2,acc2 = predictOnce(np.array([3.0, 0.0, 1.0]),np.array([0.0, -1.0, 0.5]),np.array([-3.0, -2.0, 1.0]),1.5,model1)
+        
     while not rospy.is_shutdown():
-        flying_gate = 1.5 * sin(np.pi*(rospy.Time.now()-init_time).to_sec()/8.0)
-        # if current_position[0] < 0.0:
-        #     wpy = 1.5 * sin(np.pi*(rospy.Time.now()-init_time).to_sec()/10.0)
-        gate_setpoint.vector.x = flying_gate
-        gate_setpoint.header.stamp = rospy.Time.now()
-        gate_pub.publish(gate_setpoint)
-
         if status == 0 :
-            if current_position[0] < -1.0:
-                wpy = flying_gate - 1.0
             model = model0
-            waypoint0 = np.array([0.0, wpy, 0.6])
-            waypoint1 = np.array([3.0, 1.0, 1.0])
+            waypoint0 = np.array([0.0, 1.0, 1.4])
+            waypoint1 = np.array([3.0, 0.0, 1.0])
             error = waypoint1 - current_position
             if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
                 status = 1
-            waypoint_setpoint.vector.z = 0.6
-
+            if current_position[0] > 2.0:
+                status = 1            
         if status == 1 :
-            if current_position[0] > 1.0:
-                wpy = flying_gate + 1.0
             model = model1
-            waypoint0 = np.array([0.0, wpy, 1.4])
-            waypoint1 = np.array([-3.0, 1.0, 1.0])
+            waypoint0 = np.array([0.0, -1.0, 0.6])
+            waypoint1 = np.array([-3.0, 0.0, 1.0])
             error = waypoint1 - current_position
             if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
                 status = 2
-            waypoint_setpoint.vector.z = 1.4
-
+            if current_position[0] < -2.0:
+                status = 2
         if status == 2 :
-            if current_position[0] < -1.0:
-                wpy = flying_gate + 1.0
             model = model0
-            waypoint0 = np.array([0.0, wpy, 1.4])
-            waypoint1 = np.array([3.0, -1.0, 1.0])
+            waypoint0 = np.array([0.0, 1.0, 1.5])
+            waypoint1 = np.array([3.0, 0.0, 1.0])  
             error = waypoint1 - current_position
             if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
                 status = 3
-            waypoint_setpoint.vector.z = 1.4
-
+            if current_position[0] > 2.0:
+                status = 3
         if status == 3 :
-            if current_position[0] > 1.0:
-                wpy = flying_gate - 1.0
             model = model1
-            waypoint0 = np.array([0.0, wpy, 0.6])
-            waypoint1 = np.array([-3.0, -1.0, 1.0])
+            waypoint0 = np.array([0.0, -1.0, 0.5])
+            waypoint1 = np.array([-3.0, -2.0, 1.0])
             error = waypoint1 - current_position
-            waypoint_setpoint.vector.z = 0.6
+            if error[0]**2 + error[1]**2 + error[2]**2 < 0.2:
+                status = 3
 
         status_setpoint.vector.x = status
         status_setpoint.header.stamp = rospy.Time.now()
         status_planner_pub.publish(status_setpoint)
-
-        waypoint_setpoint.vector.x = 0.0
-        waypoint_setpoint.vector.y = wpy
-        waypoint_setpoint.header.stamp = rospy.Time.now()
-        waypoint_pub.publish(waypoint_setpoint)
 
         input = np.zeros(15)
         # print(current_position)
@@ -430,5 +527,74 @@ if __name__ == "__main__":
         last_pqr_cmd[len(kx)-2,0] = rate_setpoint.vector.x
         last_pqr_cmd[len(kx)-2,1] = rate_setpoint.vector.y
         last_pqr_cmd[len(kx)-2,2] = rate_setpoint.vector.z
+
+        if status == 0 and current_position[0] > 1.5:
+                if poly_flag[0] :
+                    poly_init = rospy.Time.now()
+                    poly_flag[0] = 0
+                    ts0 = 0.65
+                    ts1 = 0.65
+                    waypoint1 = np.array([2.9, 0.0, 1.0])
+                    polyx,polyy,polyz = planOnce(ts0,ts1,waypoint1,point0,velocity0,acc0)
+        if status == 1 and current_position[0] < -1.7:
+                if poly_flag[1] :
+                    poly_init = rospy.Time.now()
+                    poly_flag[1] = 0
+                    ts0 = 0.7
+                    ts1 = 0.7
+                    waypoint1 = np.array([-2.9, 0.0, 1.0])
+                    polyx,polyy,polyz = planOnce(ts0,ts1,waypoint1,point1,velocity1,acc1)
+        if status == 2 and current_position[0] > 1.5:
+                if poly_flag[2] :
+                    poly_init = rospy.Time.now()
+                    poly_flag[2] = 0
+                    ts0 = 0.65
+                    ts1 = 0.65
+                    waypoint1 = np.array([2.9, 0.0, 1.0])
+                    polyx,polyy,polyz = planOnce(ts0,ts1,waypoint1,point2,velocity2,acc2)
+
+        if poly_flag[0] == 0:
+            current_t = (rospy.Time.now() - poly_init).to_sec()
+            if current_t < ts0 :
+                ts = current_t
+                t = np.array([ts**4, ts**3, ts**2, ts, 1])
+                vt = np.array([4*ts**3, 3*ts**2, 2*ts, 1, 0])
+                at = np.array([12*ts**2, 6*ts, 2, 1, 0])
+                aax = np.array([polyx[0],polyx[1],polyx[2],polyx[3],polyx[4]])
+                aay = np.array([polyy[0],polyy[1],polyy[2],polyy[3],polyy[4]])
+                aaz = np.array([polyz[0],polyz[1],polyz[2],polyz[3],polyz[4]])
+            elif current_t < ts0+ts1 :
+                ts = current_t - ts0
+                t = np.array([ts**4, ts**3, ts**2, ts, 1])
+                vt = np.array([4*ts**3, 3*ts**2, 2*ts, 1, 0])
+                at = np.array([12*ts**2, 6*ts, 2, 1, 0])
+                aax = np.array([polyx[5],polyx[6],polyx[7],polyx[8],polyx[9]])
+                aay = np.array([polyy[5],polyy[6],polyy[7],polyy[8],polyy[9]])
+                aaz = np.array([polyz[5],polyz[6],polyz[7],polyz[8],polyz[9]])
+            else :
+                pass
+            poly_setpoint.vector.x = np.dot(t, aax)
+            poly_setpoint.vector.y = np.dot(t, aay)
+            poly_setpoint.vector.z = np.dot(t, aaz)
+            poly_setpoint.header.stamp = rospy.Time.now()
+            poly_pub.publish(poly_setpoint)
+
+            polyv_setpoint.vector.x = np.dot(vt, aax)
+            polyv_setpoint.vector.y = np.dot(vt, aay)
+            polyv_setpoint.vector.z = np.dot(vt, aaz)
+            polyv_setpoint.header.stamp = rospy.Time.now()
+            polyv_pub.publish(polyv_setpoint)
+
+            polya_setpoint.vector.x = np.dot(at, aax)
+            polya_setpoint.vector.y = np.dot(at, aay)
+            polya_setpoint.vector.z = np.dot(at, aaz)
+            polya_setpoint.header.stamp = rospy.Time.now()
+            polya_pub.publish(polya_setpoint)
+
+        flag_setpoint.vector.x = poly_flag[0]
+        flag_setpoint.vector.y = poly_flag[1]
+        flag_setpoint.vector.z = poly_flag[2]
+        flag_setpoint.header.stamp = rospy.Time.now()
+        polyflag_pub.publish(flag_setpoint)
 
         rate.sleep()
